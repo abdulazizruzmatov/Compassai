@@ -57,7 +57,10 @@ const loadProfile = () => { try { return JSON.parse(localStorage.getItem("compas
 const saveProfile = (p) => localStorage.setItem("compass-profile", JSON.stringify(p));
 
 /* ---------------- AI ---------------- */
+const AI_GUARD = `You are Compass, an expert university-admissions and study-abroad advisor ONLY. You act like a specialist professor of international admissions. You ONLY discuss: universities, degrees, courses, admissions, acceptance chances, scholarships, student visas, application documents, English tests (IELTS/TOEFL), living costs for students, and student work regulations. If asked anything outside study-abroad, politely refuse in one line and steer back. Be accurate, specific and encouraging (failure is a step to success). Never invent fake universities.`;
+
 async function askAI(prompt) {
+  prompt = AI_GUARD + "\n\n" + prompt;
   const res = await fetch("/api/advisor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -103,6 +106,21 @@ List the 14 best universities in ${country} for this student, ranked by realisti
 Respond ONLY valid JSON:
 {"gaps":{"now":["their current weak points, specific, e.g. IELTS 5.5"],"target":["what each must become, e.g. IELTS 7.0+"],"plan":["concrete action steps in order"]},
 "unis":[{"name":"","city":"","acceptRate":"~X%","fit":"happy|mid|sad","needs":"one line: what THEY need for THIS uni","docs":"key documents, short","why":"one line"}]}`;
+}
+
+
+function FounderBar() {
+  return (
+    <div style={{ background: "#0e4634", color: "#DCEAE2", borderTop: "1px solid #1d5643" }}>
+      <div className="container" style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 20px", flexWrap: "wrap" }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", border: "2px solid rgba(255,255,255,0.15)", display: "grid", placeItems: "center", fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)" }}>AR</div>
+        <div style={{ flex: 1, minWidth: 200, fontSize: 13.5, lineHeight: 1.4 }}>
+          <b style={{ color: "#fff" }}>Built by {FOUNDER.name}</b> — {FOUNDER.role}
+        </div>
+        <a href="#/contact" style={{ color: "var(--mint)", fontWeight: 700, fontSize: 13, textDecoration: "none" }}>About me →</a>
+      </div>
+    </div>
+  );
 }
 
 /* ---------------- compass hero ---------------- */
@@ -631,24 +649,45 @@ function WorldPage() {
   const [error, setError] = useState("");
   const set = (k, v) => setProf((p) => ({ ...p, [k]: v }));
 
+  const wrapRef = useRef(null);
+  const globeRef = useRef(null);
+  const [w, setW] = useState(720);
+
+  useEffect(() => {
+    const onResize = () => setW(Math.min(wrapRef.current?.offsetWidth || 720, 820));
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (globeRef.current) {
+      const c = globeRef.current.controls();
+      c.autoRotate = true; c.autoRotateSpeed = 0.5;
+      c.enableZoom = true; c.minDistance = 180; c.maxDistance = 520;
+    }
+  });
+
   const explore = async (c) => {
     setCountry(c); setData(null); setError(""); setBusy(true);
     saveProfile({ ...loadProfile(), ...prof });
+    // fly the globe to the clicked country
+    const target = COUNTRY_COSTS.find((x) => x.name === c);
+    if (globeRef.current && target) globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: 1.6 }, 1000);
     try { setData(parseJSON(await askAI(worldPrompt(c, prof)))); }
     catch (e) { console.error(e); setError("Couldn't load — try again 🙏"); }
     setBusy(false);
+    setTimeout(() => document.getElementById("world-results")?.scrollIntoView({ behavior: "smooth" }), 300);
   };
-
-  const names = COUNTRY_COSTS.map((c) => c.name);
 
   return (
     <>
-      <section className="hero-dark" style={{ padding: "48px 0 40px" }}>
+      <section className="hero-dark" style={{ padding: "40px 0 24px" }}>
         <div className="container">
           <h1 className="section-title" style={{ color: "#fff" }}>World Explorer 🌍</h1>
-          <p className="section-sub" style={{ color: "#A9C6B7" }}>Pick where you dream of studying. Compass shows the best universities there by acceptance rate — and your honest personal chance: 😊 ready · 😐 borderline · 😢 needs work. Sad today just means a plan for tomorrow.</p>
+          <p className="section-sub" style={{ color: "#A9C6B7" }}>Spin the globe, zoom in, and click a country. Compass opens its best universities by acceptance rate — with your honest personal chance: 😊 ready · 😐 borderline · 😢 needs work. Sad today just means a plan for tomorrow.</p>
 
-          <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+          <div className="card" style={{ padding: 18, marginBottom: 8 }}>
             <div className="label">Your profile (used for the 😊/😢 rating)</div>
             <div className="grid3" style={{ marginTop: 8 }}>
               <input className="input" value={prof.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="IELTS e.g. 5.5 or 'not taken'" />
@@ -656,18 +695,41 @@ function WorldPage() {
               <select className="input" value={prof.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {names.map((n) => (
-              <button key={n} className="chip" style={country === n ? { background: "#fff", color: "var(--ink)", borderColor: "#fff" } : { background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.4)" }} onClick={() => explore(n)}>{n}</button>
-            ))}
+      <section className="hero-dark" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div ref={wrapRef} style={{ display: "grid", placeItems: "center", minHeight: 460, position: "relative" }}>
+            <Suspense fallback={<div className="mono" style={{ color: "#A9C6B7", animation: "blink 1.1s infinite", letterSpacing: "0.2em" }}>LOADING EARTH… 🛰️</div>}>
+              <Globe
+                ref={globeRef}
+                width={w}
+                height={Math.min(w * 0.72, 560)}
+                backgroundColor="rgba(0,0,0,0)"
+                globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg"
+                atmosphereColor="#4ade80"
+                atmosphereAltitude={0.18}
+                pointsData={COUNTRY_COSTS}
+                pointLat="lat" pointLng="lng"
+                pointColor={(d) => (country === d.name ? "#ffffff" : "#4ade80")}
+                pointAltitude={(d) => (country === d.name ? 0.08 : 0.03)}
+                pointRadius={1.2}
+                pointLabel={(d) => `<b>${d.name}</b><br/>click to explore universities`}
+                onPointClick={(d) => explore(d.name)}
+              />
+            </Suspense>
+            {!country && (
+              <div className="mono" style={{ position: "absolute", bottom: 6, color: "#A9C6B7", fontSize: 12, letterSpacing: "0.14em" }}>
+                🖱️ DRAG TO SPIN · SCROLL TO ZOOM · CLICK A GREEN DOT
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="section">
+      <section className="section" id="world-results">
         <div className="container">
-          {!country && <div style={{ textAlign: "center", color: "var(--slate)", padding: "40px 0" }}>👆 Choose a country to open its university map</div>}
           {busy && (
             <div style={{ textAlign: "center", padding: "60px 0" }}>
               <div className="mono" style={{ animation: "blink 1.1s infinite", letterSpacing: "0.2em", color: "var(--slate)" }}>SCANNING {country?.toUpperCase()} UNIVERSITIES… 🛰️</div>
@@ -677,6 +739,7 @@ function WorldPage() {
 
           {data && (
             <div style={{ display: "grid", gap: 18, animation: "rise .4s both" }}>
+              <h2 className="section-title" style={{ fontSize: 26 }}>{country} — your honest picture</h2>
               <div className="grid2">
                 <div className="card" style={{ padding: 20, borderTop: "4px solid var(--red)" }}>
                   <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>😢 Where you are now</div>
@@ -685,7 +748,7 @@ function WorldPage() {
                   </ul>
                 </div>
                 <div className="card" style={{ padding: 20, borderTop: "4px solid var(--green)" }}>
-                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>😊 Where you need to be</div>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>😊 Improvement plan</div>
                   <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 14, lineHeight: 1.7 }}>
                     {(data.gaps?.target || []).map((s, i) => <li key={i}>{s}</li>)}
                   </ul>
@@ -1103,6 +1166,8 @@ export default function App() {
       {page === "contact" && <ContactPage />}
 
       <Buddy />
+
+      <FounderBar />
 
       <footer style={{ background: "var(--ink)", color: "#A9C6B7", padding: "26px 0" }}>
         <div className="container" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, fontSize: 13 }}>
