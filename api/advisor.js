@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   const { prompt } = req.body || {};
-  if (!prompt || typeof prompt !== "string" || prompt.length > 4000) {
+  if (!prompt || typeof prompt !== "string" || prompt.length > 8000) {
     return res.status(400).json({ error: "Bad prompt" });
   }
 
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [{ role: "user", content: prompt }],
       }),
     });
