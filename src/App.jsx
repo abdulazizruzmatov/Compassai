@@ -10,7 +10,9 @@ const Globe = lazy(() => import("react-globe.gl"));
 const LINKS = {
   telegram: "https://t.me/compassabroad",
   linkedin: "https://linkedin.com/company/compassabroad",
+  email: "hello@compassabroad.com",
 };
+const FORMSPREE_ID = "xvzvqbae";
 const SPONSOR = {
   name: "New Uzbekistan University",
   city: "Tashkent, Uzbekistan 🇺🇿",
@@ -18,13 +20,22 @@ const SPONSOR = {
   cta: "Explore programmes",
   url: "https://newuu.uz",
 };
+const FOUNDER = {
+  name: "Abdulaziz Ruzmatov",
+  role: "Researcher & Founder · 🇺🇿 Uzbekistan → 🇬🇧 London",
+  bio: "Founder of MistakeMap and Compass. Ex-marketing agency owner, now a London-based researcher on startup ecosystems and founder education. Built Compass so students never have to pay a consultant to find their path — because every rejection is just redirection.",
+  stats: [["MistakeMap", "Founder"], ["2 Countries", "UK & Uzbekistan"], ["Active", "Startup Research"]],
+};
+const BLOG_POSTS = [];
 /* ======================================================= */
 
+const FIELDS = ["🎮 Game Design", "🩺 Medicine", "🤖 AI & Robotics", "💼 Business", "⚖️ Law", "🎬 Film & Media", "🌱 Environment", "🚀 Aerospace"];
 const REGIONS = ["UK & Ireland 🇬🇧", "Europe 🇪🇺", "North America 🇺🇸", "Asia 🌏", "Australia & NZ 🇦🇺", "Middle East 🕌", "Anywhere 🌍"];
 const BUDGETS = ["Need full scholarship 🎓", "Under $10k / yr", "$10–25k / yr", "$25–50k / yr", "$50k+ / yr"];
 const LEVELS = ["Foundation", "Bachelor's", "Master's", "PhD"];
 const STATUSES = ["Not started", "In progress", "Applied", "Offer", "Rejected"];
 const STATUS_COLOR = { "Not started": "var(--slate)", "In progress": "var(--amber)", "Applied": "var(--blue)", "Offer": "var(--green)", "Rejected": "var(--red)" };
+const FIT_EMOJI = { happy: "😊", mid: "😐", sad: "😢" };
 
 const code3 = (s) => (s || "???").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() || "???";
 
@@ -41,49 +52,71 @@ function usePage() {
 }
 const go = (p) => (window.location.hash = `/${p}`);
 
-/* ---------------- AI call ---------------- */
-function buildPrompt(form, excludeNames) {
-  return `You are an expert international education advisor replacing a paid consultation. Student profile:
+/* ---------------- shared profile (used by Advisor, World, Buddy) ---------------- */
+const loadProfile = () => { try { return JSON.parse(localStorage.getItem("compass-profile") || "{}"); } catch { return {}; } };
+const saveProfile = (p) => localStorage.setItem("compass-profile", JSON.stringify(p));
+
+/* ---------------- AI ---------------- */
+async function askAI(prompt) {
+  const res = await fetch("/api/advisor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const { text, error } = await res.json();
+  if (error) throw new Error(error);
+  return text;
+}
+function parseJSON(text) {
+  const clean = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+}
+
+function planPrompt(form, excludeNames) {
+  return `You are an expert international education advisor replacing a paid agency. Student profile:
 - Wants to become: ${form.goal}
 - Interests: ${form.interests}
 - Study level: ${form.level}
 - Home country: ${form.home}
 - Budget: ${form.budget}
 - Preferred regions: ${form.regions.join(", ") || "Anywhere"}
+- IELTS (or none yet): ${form.ielts || "not taken"}
+- GPA / grades: ${form.gpa || "not given"}
+- Certificates & achievements: ${form.certs || "none listed"}
 ${excludeNames.length ? `- Already suggested, DO NOT repeat: ${excludeNames.join("; ")}` : ""}
 
-Recommend exactly 5 real universities from the world's top ~1000, best-fit for this profile and budget. Real scholarships only. Be terse.
+Recommend exactly 3 real universities, best-fit for this exact profile and budget. Use realistic, current tuition figures. Assess honestly against their scores — like an agency would, but free.
 
-Respond with ONLY valid JSON, no markdown, no backticks, exactly this shape:
-{"direction":{"title":"career title","summary":"2 sentences: what this path is and why it fits","degrees":["degree 1","degree 2","degree 3"]},"unis":[{"name":"","country":"","city":"","program":"specific degree title","rank":"e.g. QS Top 150","tuition":"e.g. $14k/yr","sch":[{"n":"scholarship","c":"coverage"}],"living":"e.g. $950/mo","web":"official url","apply":"direct application portal url","email":"admissions email","visa":"visa type + proof-of-funds figure for ${form.home} citizens, one line","why":"one line why this fits"}]}`;
+Respond with ONLY valid JSON, no markdown, exactly:
+{"direction":{"title":"career title","summary":"2-3 sentences why this path fits their mind and interests","degrees":[{"name":"degree","why":"one line why this degree"}]},
+"skills":{"strong":["what already strengthens their application, incl. their certificates"],"gaps":[{"skill":"what is missing","learn":"exactly what to do/learn, with a number or resource"}],"advice":"3 sentences of honest agency-style advice; motivating: failure is a step to success"},
+"unis":[{"name":"","country":"","city":"","program":"","rank":"QS ...","fit":"happy|mid|sad","fitWhy":"one line vs their scores","tuition":"$X/yr (realistic)","living":{"rent":"$/mo","weekly":"$ groceries+transport/week"},"work":"work rules for students, one line","visa":{"type":"","funds":"proof of funds","steps":["step1","step2","step3"]},"docs":["required documents"],"sch":[{"n":"scholarship","c":"coverage"}],"apply":"application portal url","web":"official url","email":"admissions email","why":"one line why this uni"}]}`;
 }
 
-async function fetchPlan(form, excludeNames) {
-  const res = await fetch("/api/advisor", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: buildPrompt(form, excludeNames) }),
-  });
-  const { text, error } = await res.json();
-  if (error) throw new Error(error);
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+function worldPrompt(country, prof) {
+  return `You are an expert admissions analyst. Country chosen: ${country}. Student profile:
+- Goal: ${prof.goal || "undecided"} | Level: ${prof.level || "Bachelor's"} | Budget: ${prof.budget || "any"}
+- IELTS: ${prof.ielts || "not taken"} | GPA: ${prof.gpa || "not given"} | Certificates: ${prof.certs || "none"}
+
+List the 14 best universities in ${country} for this student, ranked by realistic admission chance THEN prestige. Use realistic acceptance rates. Honestly rate their personal chance: happy = likely admit, mid = borderline, sad = needs improvement first.
+
+Respond ONLY valid JSON:
+{"gaps":{"now":["their current weak points, specific, e.g. IELTS 5.5"],"target":["what each must become, e.g. IELTS 7.0+"],"plan":["concrete action steps in order"]},
+"unis":[{"name":"","city":"","acceptRate":"~X%","fit":"happy|mid|sad","needs":"one line: what THEY need for THIS uni","docs":"key documents, short","why":"one line"}]}`;
 }
 
 /* ---------------- compass hero ---------------- */
 function CompassHero() {
-  const orbitUnis = UNIVERSITIES.slice(0, 8);
-  const R = 48; // % radius for orbit chips
+  const R = 48;
   return (
     <div className="compass-wrap" aria-hidden="true">
+      <div className="compass-ring" />
       <div className="orbit">
-        {orbitUnis.map((u, i) => {
-          const a = (i / orbitUnis.length) * 2 * Math.PI;
-          const x = 50 + R * Math.cos(a);
-          const y = 50 + R * Math.sin(a);
+        {FIELDS.map((f, i) => {
+          const a = (i / FIELDS.length) * 2 * Math.PI;
           return (
-            <div key={u.name} className="orbit-chip" style={{ top: `${y}%`, left: `${x}%` }}>
-              <span>{u.qs ? `#${u.qs} ` : ""}{u.name}</span>
+            <div key={f} className="orbit-chip" style={{ top: `${50 + R * Math.sin(a)}%`, left: `${50 + R * Math.cos(a)}%` }}>
+              <span>{f}</span>
             </div>
           );
         })}
@@ -95,7 +128,7 @@ function CompassHero() {
         <span className="compass-letter" style={{ left: 12 }}>W</span>
         <div className="needle">
           <svg width="150" height="150" viewBox="0 0 100 100">
-            <polygon points="50,6 57,50 43,50" fill="#16a34a" />
+            <polygon points="50,6 57,50 43,50" fill="#4ade80" />
             <polygon points="50,94 57,50 43,50" fill="#DCEAE2" />
             <circle cx="50" cy="50" r="5.5" fill="#fff" />
           </svg>
@@ -105,26 +138,103 @@ function CompassHero() {
   );
 }
 
+/* ---------------- Buddy chat (floating) ---------------- */
+function Buddy() {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([{ role: "buddy", text: "Hey! I'm your Compass Buddy 🧭 Ask me anything — CAS letters, IELTS, visas, deadlines, documents. Short answers, no fluff." }]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => { boxRef.current?.scrollTo(0, 999999); }, [msgs, open]);
+
+  const send = async () => {
+    const q = input.trim();
+    if (!q || busy) return;
+    setInput("");
+    const history = [...msgs, { role: "you", text: q }];
+    setMsgs(history); setBusy(true);
+    try {
+      const prof = loadProfile();
+      const prompt = `You are Compass Buddy, a friendly study-abroad helper. Student profile (may be empty): IELTS ${prof.ielts || "?"}, GPA ${prof.gpa || "?"}, goal ${prof.goal || "?"}, home ${prof.home || "?"}.
+Rules: answer in under 120 words, concrete and practical, encouraging tone (failure is a step to success). If asked about CAS, visas, deadlines, documents — give the short checklist.
+Conversation so far:
+${history.slice(-6).map((m) => `${m.role === "you" ? "Student" : "Buddy"}: ${m.text}`).join("\n")}
+Buddy:`;
+      const text = await askAI(prompt);
+      setMsgs((p) => [...p, { role: "buddy", text: text.trim() }]);
+    } catch {
+      setMsgs((p) => [...p, { role: "buddy", text: "Hmm, I couldn't reach base 🛰️ — try again in a moment." }]);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <>
+      {open && (
+        <div style={{ position: "fixed", right: 22, bottom: 96, zIndex: 70, width: "min(360px, 92vw)", background: "#fff", border: "1px solid var(--line)", borderRadius: 16, boxShadow: "0 18px 50px rgba(11,61,46,0.3)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "70vh" }}>
+          <div style={{ background: "var(--ink)", color: "#fff", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="display" style={{ fontWeight: 700 }}>🧭 Compass Buddy</div>
+            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#A9C6B7", cursor: "pointer", fontSize: 16 }}>✕</button>
+          </div>
+          <div ref={boxRef} style={{ padding: 14, overflowY: "auto", display: "grid", gap: 10, flex: 1 }}>
+            {msgs.map((m, i) => (
+              <div key={i} style={{
+                justifySelf: m.role === "you" ? "end" : "start",
+                background: m.role === "you" ? "var(--accent)" : "#EFF6F1",
+                color: m.role === "you" ? "#fff" : "var(--ink)",
+                borderRadius: 12, padding: "10px 13px", fontSize: 14, lineHeight: 1.45, maxWidth: "85%", whiteSpace: "pre-wrap",
+              }}>{m.text}</div>
+            ))}
+            {busy && <div className="mono" style={{ fontSize: 12, color: "var(--slate)", animation: "blink 1.1s infinite" }}>Buddy is thinking…</div>}
+          </div>
+          <div style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid var(--line)" }}>
+            <input className="input" style={{ padding: "10px 12px", fontSize: 14 }} placeholder="e.g. What is a CAS letter?" value={input}
+              onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
+            <button className="btn btn-accent" style={{ padding: "10px 14px", fontSize: 14 }} onClick={send} disabled={busy}>→</button>
+          </div>
+        </div>
+      )}
+      <button onClick={() => setOpen(!open)} className="fab" aria-label="Compass Buddy chat" style={{ border: "none", cursor: "pointer" }}>
+        {open ? "✕" : "🧭"}
+      </button>
+    </>
+  );
+}
+
 /* ---------------- auth modal ---------------- */
 function AuthModal({ onClose }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
+
+  const google = async () => {
+    setErr("");
+    if (!supabase) { setErr("Auth not configured yet."); return; }
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    if (error) setErr(error.message);
+  };
   const send = async () => {
     setErr("");
     if (!supabase) { setErr("Auth not configured yet."); return; }
     const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
     if (error) setErr(error.message); else setSent(true);
   };
+
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(11,61,46,0.55)", display: "grid", placeItems: "center", zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: "min(420px, 92vw)", padding: 26 }}>
-        <div className="display" style={{ fontWeight: 700, fontSize: 22 }}>Sign in ✉️</div>
-        <p style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>We'll email you a magic link — no password needed. Your tracked applications sync to your account.</p>
+        <div className="display" style={{ fontWeight: 700, fontSize: 22 }}>Sign in</div>
+        <p style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>Your tracked applications sync to your account across devices.</p>
+        <button onClick={google} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "13px", borderRadius: 10, border: "1.5px solid var(--line)", background: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.4 35.1 44 30 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+          Continue with Google
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "var(--slate)", fontSize: 12 }}>
+          <div style={{ flex: 1, height: 1, background: "var(--line)" }} /> or with email <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        </div>
         {sent ? (
-          <div style={{ background: "#EAF5EF", border: "1.5px solid var(--green)", color: "var(--green)", borderRadius: 10, padding: 14, fontWeight: 700, fontSize: 14 }}>
-            ✅ Check your inbox — link sent to {email}
-          </div>
+          <div style={{ background: "#EAF5EF", border: "1.5px solid var(--green)", color: "var(--green)", borderRadius: 10, padding: 14, fontWeight: 700, fontSize: 14 }}>✅ Check your inbox — link sent to {email}</div>
         ) : (
           <>
             <input className="input" type="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -138,15 +248,15 @@ function AuthModal({ onClose }) {
   );
 }
 
-/* ---------------- marquee ---------------- */
+/* ---------------- marquee + slider ---------------- */
 function DeadlineMarquee() {
   const items = [...UNIVERSITIES, ...UNIVERSITIES];
   return (
-    <div className="marquee" aria-label="Top universities and application deadlines">
+    <div className="marquee">
       <div className="marquee-track">
         {items.map((u, i) => (
           <a key={i} href={u.web} target="_blank" rel="noreferrer" className="marquee-item" style={{ color: "#fff", textDecoration: "none" }}>
-            <span style={{ color: "#4ade80", fontWeight: 700 }}>{u.qs ? `QS #${u.qs}` : "NEW"}</span>
+            <span style={{ color: "var(--mint)", fontWeight: 700 }}>{u.qs ? `QS #${u.qs}` : "NEW"}</span>
             <span style={{ fontWeight: 600 }}>{u.name}</span>
             <span style={{ color: "#A9C6B7" }}>{u.country}</span>
             <span style={{ color: "#A9C6B7" }}>⏰ {u.deadline}</span>
@@ -157,16 +267,55 @@ function DeadlineMarquee() {
   );
 }
 
-/* ---------------- boarding pass ---------------- */
-function BoardingPass({ u, home, idx, tracked, onTrack }) {
+function UniSlider() {
+  const ref = useRef(null);
+  const nudge = (dir) => ref.current?.scrollBy({ left: dir * 290, behavior: "smooth" });
+  const sorted = [...UNIVERSITIES].filter((u) => u.qs).sort((a, b) => a.qs - b.qs);
+  return (
+    <section className="section">
+      <div className="container">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <h2 className="section-title">Top universities right now 🏛️</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-ghost" style={{ padding: "8px 14px" }} onClick={() => nudge(-1)}>‹</button>
+            <button className="btn btn-ghost" style={{ padding: "8px 14px" }} onClick={() => nudge(1)}>›</button>
+          </div>
+        </div>
+        <p className="section-sub">QS World 2026 — slide through, check the deadline, apply directly.</p>
+        <div className="slider" ref={ref}>
+          {sorted.map((u) => (
+            <div key={u.name} className="slide card" style={{ overflow: "hidden" }}>
+              <div className="slide-head">
+                <div className="mono" style={{ color: "var(--mint)", fontWeight: 700, fontSize: 13 }}>QS #{u.qs}</div>
+                <div className="display" style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.15 }}>{u.name}</div>
+              </div>
+              <div style={{ padding: 14 }}>
+                <div style={{ color: "var(--slate)", fontSize: 13 }}>{u.country}</div>
+                <div className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, margin: "8px 0 12px" }}>⏰ {u.deadline}</div>
+                <a className="btn btn-accent" style={{ padding: "9px 13px", fontSize: 13 }} href={u.applyUrl} target="_blank" rel="noreferrer">Apply ↗</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- rich uni card (advisor v2) ---------------- */
+function UniCard({ u, home, idx, tracked, onTrack }) {
   const isTracked = tracked.some((t) => (t.uni?.name || t.name) === u.name);
+  const [open, setOpen] = useState(false);
   return (
     <div className="card" style={{ overflow: "hidden", boxShadow: "0 2px 10px rgba(11,61,46,0.07)", animation: `rise .5s ${idx * 0.08}s both ease-out` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "var(--ink)", color: "#fff" }}>
-        <div className="mono" style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.05em" }}>
-          {code3(home)} <span style={{ color: "#4ade80" }}>→</span> {code3(u.city)}
+        <div className="mono" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.05em" }}>
+          {code3(home)} <span style={{ color: "var(--mint)" }}>→</span> {code3(u.city)}
         </div>
-        <div className="mono" style={{ fontSize: 11, letterSpacing: "0.12em", color: "#A9C6B7", textTransform: "uppercase" }}>{u.rank || "Ranked"}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ fontSize: 22 }} title={u.fitWhy}>{FIT_EMOJI[u.fit] || "😐"}</span>
+          <div className="mono" style={{ fontSize: 11, letterSpacing: "0.12em", color: "#A9C6B7", textTransform: "uppercase" }}>{u.rank || "Ranked"}</div>
+        </div>
       </div>
       <div style={{ padding: "16px 18px 6px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
@@ -181,24 +330,44 @@ function BoardingPass({ u, home, idx, tracked, onTrack }) {
             fontWeight: 700, fontSize: 12.5, fontFamily: "Inter, sans-serif",
           }}>{isTracked ? "✓ Tracked" : "⭐ Track"}</button>
         </div>
-        <div style={{ fontSize: 14, marginTop: 10, lineHeight: 1.45 }}>{u.why}</div>
+        <div style={{ fontSize: 14, marginTop: 8 }}>{u.why}</div>
+        <div style={{ fontSize: 13, marginTop: 6, color: "var(--slate)" }}>{FIT_EMOJI[u.fit]} <b>Your chance:</b> {u.fitWhy}</div>
+
         <div style={{ display: "flex", gap: 22, marginTop: 14, flexWrap: "wrap" }}>
           <div><div className="label">💰 Tuition</div><div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{u.tuition}</div></div>
-          <div><div className="label">🏠 Living cost</div><div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{u.living}</div></div>
+          <div><div className="label">🏠 Rent</div><div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{u.living?.rent}</div></div>
+          <div><div className="label">🛒 Weekly costs</div><div className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{u.living?.weekly}</div></div>
         </div>
+
         {u.sch?.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <div className="label">🎓 Scholarships</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {u.sch.map((s, i) => (
-                <span key={i} style={{ border: "1.5px solid var(--green)", color: "var(--green)", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 700 }}>{s.n} · {s.c}</span>
-              ))}
+              {u.sch.map((s, i) => <span key={i} style={{ border: "1.5px solid var(--green)", color: "var(--green)", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 700 }}>{s.n} · {s.c}</span>)}
             </div>
           </div>
         )}
-        <div style={{ marginTop: 14, padding: "10px 12px", background: "#EFF6F1", borderRadius: 8, fontSize: 13.5 }}>
-          <span className="mono" style={{ fontSize: 11, letterSpacing: "0.12em", color: "var(--accent)", fontWeight: 700 }}>🛂 VISA </span>{u.visa}
-        </div>
+
+        <button onClick={() => setOpen(!open)} style={{ marginTop: 14, background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 14, padding: 0 }}>
+          {open ? "▲ Hide" : "▼ Visa steps · documents · work rules"}
+        </button>
+
+        {open && (
+          <div style={{ marginTop: 10, display: "grid", gap: 10, animation: "rise .3s both" }}>
+            <div style={{ padding: "10px 12px", background: "#EFF6F1", borderRadius: 8, fontSize: 13.5 }}>
+              <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 6 }}>🛂 VISA — {u.visa?.type} · funds: {u.visa?.funds}</div>
+              <ol style={{ margin: 0, paddingLeft: 18 }}>{(u.visa?.steps || []).map((s, i) => <li key={i} style={{ marginBottom: 3 }}>{s}</li>)}</ol>
+            </div>
+            <div style={{ padding: "10px 12px", background: "#EFF6F1", borderRadius: 8, fontSize: 13.5 }}>
+              <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 6 }}>📄 DOCUMENTS</div>
+              {(u.docs || []).join(" · ")}
+            </div>
+            <div style={{ padding: "10px 12px", background: "#EFF6F1", borderRadius: 8, fontSize: 13.5 }}>
+              <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 6 }}>💼 WORKING AS A STUDENT</div>
+              {u.work}
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ borderTop: "2px dashed var(--line)", margin: "14px 0 0" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px 16px", flexWrap: "wrap" }}>
@@ -213,24 +382,24 @@ function BoardingPass({ u, home, idx, tracked, onTrack }) {
   );
 }
 
-/* ---------------- pages ---------------- */
+/* ================= PAGES ================= */
 
 function HomePage() {
   return (
     <>
-      <section className="section" style={{ padding: "64px 0 40px" }}>
+      <section className="hero-dark" style={{ padding: "64px 0 56px" }}>
         <div className="container grid2" style={{ alignItems: "center" }}>
           <div>
-            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.18em", color: "var(--accent)", fontWeight: 700 }}>🇺🇿 → 🌍 FOR STUDENTS EVERYWHERE</div>
-            <h1 className="hero-h1" style={{ fontWeight: 700, fontSize: 54, lineHeight: 1.02, letterSpacing: "-0.03em", margin: "14px 0" }}>
-              Find your direction.<br /><span style={{ color: "var(--accent)" }}>Study anywhere.</span>
+            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.18em", color: "var(--mint)", fontWeight: 700 }}>🇺🇿 → 🌍 EVERY REJECTION IS REDIRECTION</div>
+            <h1 className="hero-h1" style={{ fontWeight: 700, fontSize: 54, lineHeight: 1.02, letterSpacing: "-0.03em", margin: "14px 0", color: "#fff" }}>
+              Find your direction.<br /><span style={{ color: "var(--mint)" }}>Aim higher.</span>
             </h1>
-            <p style={{ color: "var(--slate)", fontSize: 17, maxWidth: 480, margin: "0 0 26px", lineHeight: 1.55 }}>
-              Compass turns "I want to be a game developer 🎮" into real universities, scholarships, living costs, visas and direct application links — free, no consultant.
+            <p style={{ color: "#C9DED2", fontSize: 17, maxWidth: 480, margin: "0 0 26px", lineHeight: 1.55 }}>
+              Compass turns "I want to be a game developer 🎮" into degrees explained, real universities, honest chances, visa steps, living costs and scholarships — free, no agency.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <button className="btn btn-accent" style={{ fontSize: 16, padding: "16px 26px" }} onClick={() => go("advisor")}>🧭 Who do you wanna be? →</button>
-              <button className="btn btn-ghost" onClick={() => go("scholarships")}>Scholarships 🎓</button>
+              <button className="btn btn-ghost-light" onClick={() => go("world")}>🌍 Explore countries</button>
             </div>
           </div>
           <CompassHero />
@@ -239,27 +408,27 @@ function HomePage() {
 
       <DeadlineMarquee />
 
-      <section className="section">
-        <div className="container">
-          <div className="grid4">
-            {[["1,000+", "universities matched"], [String(SCHOLARSHIPS.length), "major scholarships"], [String(COUNTRY_COSTS.length), "countries mapped"], ["$0", "consultant fees"]].map(([n, l]) => (
-              <div key={l} className="card" style={{ padding: "18px 16px", textAlign: "center" }}>
-                <div className="display" style={{ fontWeight: 700, fontSize: 28, color: "var(--accent)" }}>{n}</div>
-                <div className="label" style={{ marginBottom: 0 }}>{l}</div>
-              </div>
-            ))}
-          </div>
+      <section className="section" style={{ paddingBottom: 0 }}>
+        <div className="container grid4">
+          {[["1,000+", "universities matched"], [String(SCHOLARSHIPS.length) + "+", "major scholarships"], [String(COUNTRY_COSTS.length), "countries mapped"], ["$0", "agency fees"]].map(([n, l]) => (
+            <div key={l} className="card" style={{ padding: "18px 16px", textAlign: "center" }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 28, color: "var(--accent)" }}>{n}</div>
+              <div className="label" style={{ marginBottom: 0 }}>{l}</div>
+            </div>
+          ))}
         </div>
       </section>
+
+      <UniSlider />
 
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="container grid3">
           {[
-            ["🧭", "AI Advisor", "Describe who you want to become — get matched universities with costs, scholarships and visas.", "advisor"],
-            ["🎓", "Scholarships", "The big fully-funded ones worldwide, with coverage and typical deadlines.", "scholarships"],
-            ["🌍", "Cost Globe", "Spin the planet, tap a country, see rent, food, transport and the visa you'd need.", "globe"],
+            ["🧭", "AI Advisor", "Your mind → degrees explained, matched universities, honest chances, visa steps, full costs.", "advisor"],
+            ["🌍", "World Explorer", "Pick a country → top 20 unis by acceptance rate, with your personal 😊/😢 chance and what to improve.", "world"],
+            ["🎓", "Scholarships", "The famous ones + a live feed from 100 Telegram scholarship channels.", "scholarships"],
           ].map(([e, t, d, p]) => (
-            <button key={t} onClick={() => go(p)} className="card" style={{ padding: 22, textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }}>
+            <button key={t} onClick={() => go(p)} className="card" style={{ padding: 22, textAlign: "left", cursor: "pointer" }}>
               <div style={{ fontSize: 30 }}>{e}</div>
               <div className="display" style={{ fontWeight: 700, fontSize: 19, margin: "8px 0 6px" }}>{t}</div>
               <div style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>{d}</div>
@@ -271,19 +440,19 @@ function HomePage() {
 
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="container">
-          <div className="card" style={{ padding: 24, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", borderLeft: "4px solid var(--accent)" }}>
+          <div className="card" style={{ padding: 24, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", background: "var(--ink)", color: "#fff", border: "none" }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--slate)" }}>SPONSORED 🤝</div>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: "0.16em", color: "#A9C6B7" }}>SPONSORED 🤝</div>
               <div className="display" style={{ fontWeight: 700, fontSize: 22, marginTop: 4 }}>{SPONSOR.name}</div>
-              <div style={{ color: "var(--slate)", fontSize: 13.5 }}>{SPONSOR.city}</div>
-              <p style={{ fontSize: 14.5, lineHeight: 1.5, margin: "10px 0 0" }}>{SPONSOR.pitch}</p>
+              <div style={{ color: "#A9C6B7", fontSize: 13.5 }}>{SPONSOR.city}</div>
+              <p style={{ fontSize: 14.5, lineHeight: 1.5, margin: "10px 0 0", color: "#DCEAE2" }}>{SPONSOR.pitch}</p>
             </div>
             <a className="btn btn-accent" href={SPONSOR.url} target="_blank" rel="noreferrer">{SPONSOR.cta} ↗</a>
           </div>
         </div>
       </section>
 
-      <section className="section" style={{ background: "#ECF3EE", textAlign: "center" }}>
+      <section className="section" style={{ background: "#E6F0E9", textAlign: "center" }}>
         <div className="container">
           <h2 className="section-title">Never miss a deadline 🔔</h2>
           <p className="section-sub" style={{ margin: "0 auto 24px" }}>New scholarships, deadline alerts and admission tips — follow the channels.</p>
@@ -298,9 +467,11 @@ function HomePage() {
 }
 
 function AdvisorPage({ tracked, track, session }) {
-  const [form, setForm] = useState({ goal: "", interests: "", level: "Bachelor's", home: "", budget: BUDGETS[2], regions: [] });
+  const saved = loadProfile();
+  const [form, setForm] = useState({ goal: saved.goal || "", interests: saved.interests || "", level: saved.level || "Bachelor's", home: saved.home || "", budget: saved.budget || BUDGETS[2], regions: saved.regions || [], ielts: saved.ielts || "", gpa: saved.gpa || "", certs: saved.certs || "" });
   const [phase, setPhase] = useState("form");
   const [plan, setPlan] = useState(null);
+  const [skills, setSkills] = useState(null);
   const [unis, setUnis] = useState([]);
   const [error, setError] = useState("");
   const [more, setMore] = useState(false);
@@ -310,10 +481,10 @@ function AdvisorPage({ tracked, track, session }) {
   const ready = form.goal.trim() && form.interests.trim() && form.home.trim();
 
   const run = async () => {
-    setError(""); setPhase("loading");
+    setError(""); setPhase("loading"); saveProfile(form);
     try {
-      const p = await fetchPlan(form, []);
-      setPlan(p.direction); setUnis(p.unis || []); setPhase("results");
+      const p = parseJSON(await askAI(planPrompt(form, [])));
+      setPlan(p.direction); setSkills(p.skills); setUnis(p.unis || []); setPhase("results");
       if (supabase && session) await supabase.from("plans").insert({ user_id: session.user.id, profile: form, result: p });
     } catch (e) { console.error(e); setError("Couldn't build your plan — try again 🙏"); setPhase("form"); }
   };
@@ -321,7 +492,7 @@ function AdvisorPage({ tracked, track, session }) {
   const loadMore = async () => {
     setMore(true); setError("");
     try {
-      const p = await fetchPlan(form, unis.map((u) => u.name));
+      const p = parseJSON(await askAI(planPrompt(form, unis.map((u) => u.name))));
       setUnis((prev) => [...prev, ...(p.unis || [])]);
     } catch { setError("Couldn't load more right now."); }
     setMore(false);
@@ -331,7 +502,7 @@ function AdvisorPage({ tracked, track, session }) {
     <section className="section">
       <div className="container">
         <h1 className="section-title">Your AI advisor 🧭</h1>
-        <p className="section-sub">Describe yourself like you'd tell a friend. Compass builds your direction, matches universities, and you track them — all in one place.</p>
+        <p className="section-sub">Tell it your mind. It answers like an agency would — degrees explained, honest chances against your scores, visa steps, real costs, documents — for free.</p>
 
         {phase === "form" && (
           <div className="card" style={{ padding: "22px 22px 26px", boxShadow: "0 2px 10px rgba(11,61,46,0.06)" }}>
@@ -355,6 +526,20 @@ function AdvisorPage({ tracked, track, session }) {
                   <select className="input" value={form.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
                 </div>
               </div>
+              <div className="grid2">
+                <div>
+                  <div className="label">IELTS / English score 🗣️ (or empty)</div>
+                  <input className="input" value={form.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="e.g. 6.5, or 'not taken yet'" />
+                </div>
+                <div>
+                  <div className="label">GPA / grades 📊</div>
+                  <input className="input" value={form.gpa} onChange={(e) => set("gpa", e.target.value)} placeholder="e.g. 4.2/5, or A-levels AAB" />
+                </div>
+              </div>
+              <div>
+                <div className="label">Certificates & achievements 🏅 (they strengthen you!)</div>
+                <textarea className="input" style={{ minHeight: 60, resize: "vertical" }} value={form.certs} onChange={(e) => set("certs", e.target.value)} placeholder="e.g. SAT 1350, olympiad medal, coding bootcamp, volunteering…" />
+              </div>
               <div>
                 <div className="label">Budget 💰</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -375,31 +560,60 @@ function AdvisorPage({ tracked, track, session }) {
 
         {phase === "loading" && (
           <div style={{ textAlign: "center", padding: "90px 0" }}>
-            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>SCANNING 1,000 UNIVERSITIES… 🛰️</div>
-            <div className="display" style={{ fontWeight: 700, fontSize: 34, marginTop: 14 }}>Plotting your route <span style={{ color: "var(--accent)" }}>→</span></div>
+            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>READING YOUR PROFILE… BUILDING YOUR ROUTE 🛰️</div>
+            <div className="display" style={{ fontWeight: 700, fontSize: 34, marginTop: 14 }}>Plotting your direction <span style={{ color: "var(--accent)" }}>→</span></div>
           </div>
         )}
 
         {phase === "results" && plan && (
           <div style={{ display: "grid", gap: 18 }}>
             <div style={{ background: "var(--ink)", color: "#fff", borderRadius: 14, padding: "20px 22px", animation: "rise .5s both" }}>
-              <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "#4ade80" }}>🎯 YOUR DIRECTION</div>
+              <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "var(--mint)" }}>🎯 YOUR DIRECTION</div>
               <div className="display" style={{ fontWeight: 700, fontSize: 28, margin: "6px 0 8px" }}>{plan.title}</div>
-              <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "#DCEAE2", maxWidth: 640 }}>{plan.summary}</div>
+              <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "#DCEAE2", maxWidth: 680 }}>{plan.summary}</div>
               {plan.degrees?.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-                  {plan.degrees.map((d, i) => <span key={i} className="mono" style={{ border: "1.5px solid #2E5C4A", borderRadius: 8, padding: "5px 10px", fontSize: 12.5 }}>{d}</span>)}
+                <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+                  {plan.degrees.map((d, i) => (
+                    <div key={i} style={{ border: "1.5px solid #2E5C4A", borderRadius: 10, padding: "10px 13px", fontSize: 13.5 }}>
+                      <b style={{ color: "var(--mint)" }}>{d.name}</b> — {d.why}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {unis.map((u, i) => <BoardingPass key={u.name + i} u={u} home={form.home} idx={i % 5} tracked={tracked} onTrack={track} />)}
+            {skills && (
+              <div className="grid2">
+                <div className="card" style={{ padding: 20, borderTop: "4px solid var(--green)" }}>
+                  <div className="label">💪 What already strengthens you</div>
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 14, lineHeight: 1.6 }}>
+                    {(skills.strong || []).map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+                <div className="card" style={{ padding: 20, borderTop: "4px solid var(--amber)" }}>
+                  <div className="label">📈 What to learn next</div>
+                  <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+                    {(skills.gaps || []).map((g, i) => (
+                      <div key={i} style={{ fontSize: 14, lineHeight: 1.5 }}><b>{g.skill}</b> → {g.learn}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {skills?.advice && (
+              <div className="card" style={{ padding: 20, background: "#E6F0E9", border: "none" }}>
+                <div className="label">🧭 Honest advice</div>
+                <div style={{ fontSize: 15, lineHeight: 1.6 }}>{skills.advice}</div>
+              </div>
+            )}
+
+            {unis.map((u, i) => <UniCard key={u.name + i} u={u} home={form.home} idx={i % 3} tracked={tracked} onTrack={track} />)}
             {error && <div style={{ color: "var(--red)", fontWeight: 700, fontSize: 14, textAlign: "center" }}>{error}</div>}
 
-            <button className="btn btn-ghost" style={{ padding: 15 }} onClick={loadMore} disabled={more}>{more ? "Searching… 🛰️" : "➕ Show 5 more universities"}</button>
+            <button className="btn btn-ghost" style={{ padding: 15 }} onClick={loadMore} disabled={more}>{more ? "Searching… 🛰️" : "➕ Show 3 more universities"}</button>
             <button onClick={() => { setPhase("form"); setPlan(null); setUnis([]); }} style={{ background: "none", border: "none", color: "var(--slate)", cursor: "pointer", fontSize: 13 }} className="mono">← START A NEW PLAN</button>
             <div style={{ fontSize: 12, color: "var(--slate)", textAlign: "center", lineHeight: 1.5 }}>
-              Figures are AI estimates — always confirm tuition, scholarships and visa rules on official sites before applying.
+              AI estimates — always confirm tuition, scholarships and visa rules on official sites before applying.
             </div>
           </div>
         )}
@@ -408,95 +622,211 @@ function AdvisorPage({ tracked, track, session }) {
   );
 }
 
-function ScholarshipsPage() {
+function WorldPage() {
+  const saved = loadProfile();
+  const [prof, setProf] = useState({ goal: saved.goal || "", level: saved.level || "Bachelor's", budget: saved.budget || BUDGETS[2], ielts: saved.ielts || "", gpa: saved.gpa || "", certs: saved.certs || "" });
+  const [country, setCountry] = useState(null);
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k, v) => setProf((p) => ({ ...p, [k]: v }));
+
+  const explore = async (c) => {
+    setCountry(c); setData(null); setError(""); setBusy(true);
+    saveProfile({ ...loadProfile(), ...prof });
+    try { setData(parseJSON(await askAI(worldPrompt(c, prof)))); }
+    catch (e) { console.error(e); setError("Couldn't load — try again 🙏"); }
+    setBusy(false);
+  };
+
+  const names = COUNTRY_COSTS.map((c) => c.name);
+
   return (
-    <section className="section">
-      <div className="container">
-        <h1 className="section-title">Scholarships around the world 🎓</h1>
-        <p className="section-sub">The big fully-funded ones. Deadlines are typical — always check the official page, they move every year.</p>
-        <div className="grid3">
-          {SCHOLARSHIPS.map((s) => (
-            <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="card" style={{ padding: 18, textDecoration: "none", display: "block" }}>
-              <div style={{ fontSize: 26 }}>{s.emoji}</div>
-              <div className="display" style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>{s.name}</div>
-              <div style={{ color: "var(--slate)", fontSize: 13 }}>{s.country} · {s.level}</div>
-              <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 13.5, marginTop: 8 }}>💸 {s.coverage}</div>
-              <div className="mono" style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700, marginTop: 8 }}>⏰ {s.deadline}</div>
-            </a>
-          ))}
+    <>
+      <section className="hero-dark" style={{ padding: "48px 0 40px" }}>
+        <div className="container">
+          <h1 className="section-title" style={{ color: "#fff" }}>World Explorer 🌍</h1>
+          <p className="section-sub" style={{ color: "#A9C6B7" }}>Pick where you dream of studying. Compass shows the best universities there by acceptance rate — and your honest personal chance: 😊 ready · 😐 borderline · 😢 needs work. Sad today just means a plan for tomorrow.</p>
+
+          <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+            <div className="label">Your profile (used for the 😊/😢 rating)</div>
+            <div className="grid3" style={{ marginTop: 8 }}>
+              <input className="input" value={prof.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="IELTS e.g. 5.5 or 'not taken'" />
+              <input className="input" value={prof.gpa} onChange={(e) => set("gpa", e.target.value)} placeholder="GPA e.g. 4.2/5" />
+              <select className="input" value={prof.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {names.map((n) => (
+              <button key={n} className="chip" style={country === n ? { background: "#fff", color: "var(--ink)", borderColor: "#fff" } : { background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.4)" }} onClick={() => explore(n)}>{n}</button>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          {!country && <div style={{ textAlign: "center", color: "var(--slate)", padding: "40px 0" }}>👆 Choose a country to open its university map</div>}
+          {busy && (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <div className="mono" style={{ animation: "blink 1.1s infinite", letterSpacing: "0.2em", color: "var(--slate)" }}>SCANNING {country?.toUpperCase()} UNIVERSITIES… 🛰️</div>
+            </div>
+          )}
+          {error && <div style={{ color: "var(--red)", fontWeight: 700, textAlign: "center" }}>{error}</div>}
+
+          {data && (
+            <div style={{ display: "grid", gap: 18, animation: "rise .4s both" }}>
+              <div className="grid2">
+                <div className="card" style={{ padding: 20, borderTop: "4px solid var(--red)" }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>😢 Where you are now</div>
+                  <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 14, lineHeight: 1.7 }}>
+                    {(data.gaps?.now || []).map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+                <div className="card" style={{ padding: 20, borderTop: "4px solid var(--green)" }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>😊 Where you need to be</div>
+                  <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 14, lineHeight: 1.7 }}>
+                    {(data.gaps?.target || []).map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              </div>
+              {data.gaps?.plan?.length > 0 && (
+                <div className="card" style={{ padding: 20, background: "#E6F0E9", border: "none" }}>
+                  <div className="label">🪜 Your steps from 😢 to 😊</div>
+                  <ol style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 14.5, lineHeight: 1.7 }}>
+                    {data.gaps.plan.map((s, i) => <li key={i}>{s}</li>)}
+                  </ol>
+                </div>
+              )}
+
+              <h2 className="section-title" style={{ fontSize: 26 }}>Best universities in {country?.replace(/ .*/, "")} for you</h2>
+              <div className="grid3">
+                {(data.unis || []).map((u) => (
+                  <div key={u.name} className="card" style={{ overflow: "hidden" }}>
+                    <div className="sch-head" style={{ padding: "14px 16px" }}>
+                      <div className="display" style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{u.name}</div>
+                      <div style={{ fontSize: 26 }}>{FIT_EMOJI[u.fit] || "😐"}</div>
+                    </div>
+                    <div style={{ padding: 14 }}>
+                      <div style={{ color: "var(--slate)", fontSize: 13 }}>📍 {u.city} · accept ~<b>{u.acceptRate}</b></div>
+                      <div style={{ fontSize: 13.5, margin: "8px 0" }}>{u.why}</div>
+                      <div style={{ fontSize: 13, padding: "8px 10px", background: "#EFF6F1", borderRadius: 8 }}><b>You need:</b> {u.needs}</div>
+                      <div className="mono" style={{ fontSize: 11.5, color: "var(--slate)", marginTop: 8 }}>📄 {u.docs}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--slate)", textAlign: "center" }}>Acceptance rates and chances are AI estimates — confirm on official pages.</div>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
 
-function GlobePage() {
-  const [picked, setPicked] = useState(null);
-  const wrapRef = useRef(null);
-  const globeRef = useRef(null);
-  const [w, setW] = useState(600);
-
+function ScholarshipsPage() {
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [feed, setFeed] = useState([]);
+  const FILTERS = ["All", "Full ride", "UK 🇬🇧", "Europe 🇪🇺", "Asia 🌏", "Americas 🌎"];
+  const fullRide = (s) => /full/i.test(s.coverage);
+  const region = (s) => {
+    if (/UK/.test(s.country)) return "UK 🇬🇧";
+    if (/(Germany|Europe|Hungary|France|Netherlands|Switzerland|Türkiye)/.test(s.country)) return "Europe 🇪🇺";
+    if (/(Japan|China|Korea|Australia)/.test(s.country)) return "Asia 🌏";
+    if (/USA/.test(s.country)) return "Americas 🌎";
+    return "Other";
+  };
   useEffect(() => {
-    const onResize = () => setW(Math.min(wrapRef.current?.offsetWidth || 600, 640));
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    (async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from("scholarship_feed").select("*").order("posted_at", { ascending: false }).limit(12);
+      setFeed(data || []);
+    })();
   }, []);
-
-  useEffect(() => {
-    if (globeRef.current) {
-      globeRef.current.controls().autoRotate = true;
-      globeRef.current.controls().autoRotateSpeed = 0.6;
-    }
+  const list = SCHOLARSHIPS.filter((s) => {
+    if (filter === "Full ride" && !fullRide(s)) return false;
+    if (["UK 🇬🇧", "Europe 🇪🇺", "Asia 🌏", "Americas 🌎"].includes(filter) && region(s) !== filter) return false;
+    if (q && !`${s.name} ${s.country} ${s.level}`.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
   });
+  const countFull = SCHOLARSHIPS.filter(fullRide).length;
+  const countries = new Set(SCHOLARSHIPS.map((s) => s.country)).size;
 
   return (
-    <section className="section" style={{ background: "var(--ink)", color: "#fff", minHeight: "70vh" }}>
-      <div className="container">
-        <h1 className="section-title">Spin the globe 🌍</h1>
-        <p className="section-sub" style={{ color: "#A9C6B7" }}>Drag to turn it, tap a marker — see estimated rent, food, transport and the visa you'd need there.</p>
-        <div className="grid2" style={{ alignItems: "center" }}>
-          <div ref={wrapRef} style={{ display: "grid", placeItems: "center", minHeight: 380 }}>
-            <Suspense fallback={<div className="mono" style={{ animation: "blink 1.1s infinite", letterSpacing: "0.2em" }}>LOADING EARTH… 🛰️</div>}>
-              <Globe
-                ref={globeRef}
-                width={w}
-                height={Math.min(w, 460)}
-                backgroundColor="rgba(0,0,0,0)"
-                globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg"
-                pointsData={COUNTRY_COSTS}
-                pointLat="lat" pointLng="lng"
-                pointColor={() => "#4ade80"}
-                pointAltitude={0.02} pointRadius={0.9}
-                pointLabel={(d) => `<b>${d.name}</b><br/>Rent: ${d.rent}/mo`}
-                onPointClick={(d) => setPicked(d)}
-              />
-            </Suspense>
-          </div>
-          <div>
-            {picked ? (
-              <div className="card" style={{ padding: 22, color: "var(--ink)", animation: "rise .4s both" }}>
-                <div className="display" style={{ fontWeight: 700, fontSize: 24 }}>{picked.name}</div>
-                <div className="grid3" style={{ marginTop: 16 }}>
-                  <div><div className="label">🏠 Rent /mo</div><div className="mono" style={{ fontWeight: 700 }}>{picked.rent}</div></div>
-                  <div><div className="label">🍜 Food /mo</div><div className="mono" style={{ fontWeight: 700 }}>{picked.food}</div></div>
-                  <div><div className="label">🚌 Transport</div><div className="mono" style={{ fontWeight: 700 }}>{picked.transport}</div></div>
-                </div>
-                <div style={{ marginTop: 16, padding: "10px 12px", background: "#EFF6F1", borderRadius: 8, fontSize: 13.5 }}>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>🛂 VISA </span>{picked.visa}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 14, color: "var(--green)", fontWeight: 700 }}>💡 {picked.note}</div>
+    <>
+      <section className="hero-dark" style={{ padding: "48px 0 40px", textAlign: "center" }}>
+        <div className="container">
+          <h1 className="section-title" style={{ color: "#fff", fontSize: 40 }}>🎓 Scholarships Around the World</h1>
+          <p style={{ color: "#C9DED2", margin: "0 auto 26px", maxWidth: 560 }}>{SCHOLARSHIPS.length}+ major programmes · billions in funding · don't pay for what's free</p>
+          <div className="grid3" style={{ maxWidth: 640, margin: "0 auto 26px" }}>
+            {[[String(SCHOLARSHIPS.length), "programmes"], [String(countFull), "full rides"], [String(countries), "destinations"]].map(([n, l]) => (
+              <div key={l} style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, padding: "16px 12px" }}>
+                <div className="display" style={{ fontWeight: 700, fontSize: 26, color: "var(--mint)" }}>{n}</div>
+                <div className="mono" style={{ fontSize: 11, letterSpacing: "0.12em", color: "#A9C6B7", textTransform: "uppercase" }}>{l}</div>
               </div>
-            ) : (
-              <div style={{ border: "1.5px dashed #2E5C4A", borderRadius: 14, padding: "40px 24px", textAlign: "center", color: "#A9C6B7" }}>
-                👆 Tap a green marker to see costs for that country
-              </div>
-            )}
+            ))}
           </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            {FILTERS.map((f) => (
+              <button key={f} className="chip" style={filter === f ? { background: "#fff", color: "var(--ink)", borderColor: "#fff" } : { background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.4)" }} onClick={() => setFilter(f)}>{f}</button>
+            ))}
+          </div>
+          <input className="input" style={{ maxWidth: 480, margin: "0 auto", display: "block" }} placeholder="Search scholarships… 🔎" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <div style={{ fontSize: 12, color: "#7fa08f", marginTop: 16 }}>Estimates for students, 2026 — always double-check official sources.</div>
-      </div>
-    </section>
+      </section>
+
+      {/* live feed */}
+      <section className="section" style={{ paddingBottom: 0 }}>
+        <div className="container">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <h2 className="section-title" style={{ fontSize: 24, margin: 0 }}>🔴 Live from Telegram</h2>
+            <span className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, animation: "blink 1.6s infinite" }}>● LIVE</span>
+          </div>
+          {feed.length === 0 ? (
+            <div className="card" style={{ padding: 18, fontSize: 14, color: "var(--slate)" }}>
+              Feed warming up 🔌 — new scholarships from 100+ Telegram channels will appear here the moment they're posted. Meanwhile, join <a href={LINKS.telegram} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 700 }}>our channel</a>.
+            </div>
+          ) : (
+            <div className="grid3">
+              {feed.map((f) => (
+                <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className="card" style={{ padding: 16, textDecoration: "none", display: "block" }}>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>@{f.source} · {new Date(f.posted_at).toLocaleDateString()}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, margin: "6px 0", lineHeight: 1.4 }}>{f.title}</div>
+                  {f.coverage && <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 13 }}>💸 {f.coverage}</div>}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <h2 className="section-title" style={{ fontSize: 24 }}>🏆 The famous ones</h2>
+          <div style={{ color: "var(--slate)", fontSize: 14, marginBottom: 14 }}>Showing <b>{list.length}</b> of {SCHOLARSHIPS.length}</div>
+          <div className="grid3">
+            {list.map((s) => (
+              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="card" style={{ textDecoration: "none", overflow: "hidden", display: "block" }}>
+                <div className="sch-head">
+                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>{s.name}</div>
+                  <div style={{ fontSize: 26 }}>{s.emoji}</div>
+                </div>
+                <div style={{ padding: 16 }}>
+                  <div style={{ color: "var(--slate)", fontSize: 13 }}>{s.country} · {s.level}</div>
+                  <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 14, marginTop: 10 }}>💸 {s.coverage}</div>
+                  <div className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, marginTop: 8 }}>⏰ {s.deadline}</div>
+                  <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13.5, marginTop: 12 }}>Official page →</div>
+                </div>
+              </a>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--slate)", textAlign: "center", marginTop: 20 }}>Deadlines are typical — always confirm on the official page.</div>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -511,8 +841,7 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
     <section className="section">
       <div className="container">
         <h1 className="section-title">My applications 📋</h1>
-        <p className="section-sub">{session ? "Synced to your account ✅" : "Saved on this device — sign in to sync across devices 🔄"}</p>
-
+        <p className="section-sub">{session ? "Synced to your account ✅" : "Saved on this device — sign in with Google or email to sync across devices 🔄"}</p>
         <div className="grid4" style={{ marginBottom: 18 }}>
           {[["Tracked", counts.total, "var(--ink)"], ["In progress", counts.progress, "var(--amber)"], ["Applied", counts.applied, "var(--blue)"], ["Offers 🎉", counts.offers, "var(--green)"]].map(([l, n, c]) => (
             <div key={l} className="card" style={{ padding: "14px 16px", textAlign: "center" }}>
@@ -521,7 +850,6 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
             </div>
           ))}
         </div>
-
         {tracked.length === 0 ? (
           <div style={{ border: "1.5px dashed var(--line)", borderRadius: 14, padding: "50px 24px", textAlign: "center", background: "var(--card)" }}>
             <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>Nothing tracked yet 👀</div>
@@ -558,6 +886,133 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
         )}
       </div>
     </section>
+  );
+}
+
+function BlogPage() {
+  return (
+    <section className="section">
+      <div className="container blog-layout">
+        <aside style={{ display: "grid", gap: 16 }}>
+          <div style={{ background: "var(--ink)", color: "#fff", borderRadius: 14, padding: 20 }}>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: "0.16em", color: "#A9C6B7" }}>SPONSORED 🤝</div>
+            <div className="display" style={{ fontWeight: 700, fontSize: 19, margin: "6px 0" }}>{SPONSOR.name}</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "#DCEAE2", margin: "0 0 14px" }}>{SPONSOR.pitch}</p>
+            <a className="btn btn-accent" style={{ padding: "10px 14px", fontSize: 13 }} href={SPONSOR.url} target="_blank" rel="noreferrer">Learn more →</a>
+          </div>
+          <div className="card" style={{ padding: 20 }}>
+            <div className="label">🔔 Updates</div>
+            <p style={{ fontSize: 13.5, color: "var(--slate)", lineHeight: 1.5, margin: "0 0 12px" }}>Deadline alerts and new scholarships, weekly.</p>
+            <a className="btn btn-ink" style={{ padding: "10px 14px", fontSize: 13, display: "block", textAlign: "center" }} href={LINKS.telegram} target="_blank" rel="noreferrer">✈️ Join Telegram</a>
+          </div>
+        </aside>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <h1 className="section-title">Blog & Guides 📚</h1>
+              <p className="section-sub" style={{ margin: 0 }}>Admissions tips, scholarship breakdowns and stories where failure became the first step to success.</p>
+            </div>
+            <a className="btn btn-accent" href={`mailto:${LINKS.email}?subject=Blog post for Compass`}>Write a post</a>
+          </div>
+          {BLOG_POSTS.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "90px 0", color: "var(--slate)" }}>
+              <div style={{ fontSize: 40 }}>📝</div>
+              <div className="display" style={{ fontWeight: 700, fontSize: 20, color: "var(--ink)", marginTop: 8 }}>No blog posts yet.</div>
+              <div style={{ fontSize: 14, marginTop: 6 }}>Be the first to share a guide or your admission story.</div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 14, marginTop: 22 }}>
+              {BLOG_POSTS.map((p) => (
+                <a key={p.title} href={p.url} className="card" style={{ padding: 20, textDecoration: "none", display: "block" }}>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>{p.tag} · {p.date}</div>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 19, margin: "6px 0" }}>{p.title}</div>
+                  <div style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>{p.text}</div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContactPage() {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", country: "", message: "" });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (r.ok) setSent(true);
+    } catch (e) { console.error(e); }
+    setBusy(false);
+  };
+
+  return (
+    <>
+      <section className="section">
+        <div className="container grid2" style={{ alignItems: "start" }}>
+          <div>
+            <h1 className="section-title">Contact Us 💬</h1>
+            <p className="section-sub">Questions, partnership ideas, or a university that wants the sponsored slot?</p>
+            <div style={{ display: "grid", gap: 16, marginTop: 10 }}>
+              {[["✉️", "Email", LINKS.email], ["⏱️", "Response time", "Within 24 hours"], ["🌍", "Serving", "Students everywhere"]].map(([e, t, d]) => (
+                <div key={t} style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 12, background: "#E6F0E9", display: "grid", placeItems: "center", fontSize: 20 }}>{e}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{t}</div>
+                    <div style={{ color: "var(--slate)", fontSize: 14 }}>{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{ padding: 24 }}>
+            <div className="display" style={{ fontWeight: 700, fontSize: 20 }}>Send a message</div>
+            <p style={{ color: "var(--slate)", fontSize: 13.5, margin: "4px 0 16px" }}>We read every message.</p>
+            {sent ? (
+              <div style={{ background: "#EAF5EF", border: "1.5px solid var(--green)", color: "var(--green)", borderRadius: 10, padding: 16, fontWeight: 700 }}>✅ Sent — talk soon!</div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                <div><div className="label">Name *</div><input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Your name" /></div>
+                <div><div className="label">Email *</div><input className="input" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="your@email.com" /></div>
+                <div><div className="label">Country</div><input className="input" value={form.country} onChange={(e) => set("country", e.target.value)} placeholder="e.g. Uzbekistan" /></div>
+                <div><div className="label">Message *</div><textarea className="input" style={{ minHeight: 110, resize: "vertical" }} value={form.message} onChange={(e) => set("message", e.target.value)} /></div>
+                <button className="btn btn-accent" onClick={submit} disabled={busy || !form.name || !form.email.includes("@") || !form.message}>{busy ? "Sending…" : "Send Message →"}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="hero-dark" style={{ padding: "56px 0" }}>
+        <div className="container" style={{ display: "flex", gap: 30, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ width: 150, height: 150, borderRadius: "50%", flexShrink: 0, background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", border: "4px solid rgba(255,255,255,0.15)", display: "grid", placeItems: "center", fontSize: 48, fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)" }}>AR</div>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "#A9C6B7" }}>BUILT & FOUNDED BY</div>
+            <div className="display" style={{ fontWeight: 700, fontSize: 32, color: "#fff", margin: "6px 0" }}>{FOUNDER.name}</div>
+            <div style={{ color: "var(--mint)", fontWeight: 700, fontSize: 14.5 }}>{FOUNDER.role}</div>
+            <p style={{ color: "#DCEAE2", fontSize: 15, lineHeight: 1.6, maxWidth: 640, margin: "12px 0 18px" }}>{FOUNDER.bio}</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {FOUNDER.stats.map(([n, l]) => (
+                <div key={l} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, padding: "12px 18px", textAlign: "center" }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 18, color: "#fff" }}>{n}</div>
+                  <div className="mono" style={{ fontSize: 10.5, letterSpacing: "0.1em", color: "#A9C6B7", textTransform: "uppercase" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -612,21 +1067,19 @@ export default function App() {
     if (supabase && session) await supabase.from("tracked_applications").delete().eq("id", id);
   };
 
-  const NAV = [["home", "Home"], ["advisor", "🧭 Advisor"], ["scholarships", "🎓 Scholarships"], ["globe", "🌍 Globe"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`]];
+  const NAV = [["home", "Home"], ["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
 
   return (
     <div>
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--line)" }}>
-        <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--line)" }}>
+        <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", gap: 10 }}>
           <a href="#/home" className="logo" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.02em", textDecoration: "none" }}>
             🧭 Compass<span style={{ color: "var(--accent)" }}>.</span>
           </a>
-          <nav className="nav-links" style={{ display: "flex", gap: 4 }}>
-            {NAV.map(([id, l]) => (
-              <a key={id} href={`#/${id}`} className={`nav-link ${page === id ? "active" : ""}`}>{l}</a>
-            ))}
+          <nav className="nav-links" style={{ display: "flex", gap: 2 }}>
+            {NAV.map(([id, l]) => <a key={id} href={`#/${id}`} className={`nav-link ${page === id ? "active" : ""}`}>{l}</a>)}
           </nav>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {session ? (
@@ -643,18 +1096,23 @@ export default function App() {
 
       {page === "home" && <HomePage />}
       {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} />}
+      {page === "world" && <WorldPage />}
       {page === "scholarships" && <ScholarshipsPage />}
-      {page === "globe" && <GlobePage />}
       {page === "tracker" && <TrackerPage tracked={tracked} updateTrack={updateTrack} removeTrack={removeTrack} session={session} />}
+      {page === "blog" && <BlogPage />}
+      {page === "contact" && <ContactPage />}
 
-      {page !== "advisor" && (
-        <a href="#/advisor" className="fab" aria-label="Ask the AI advisor">🧭</a>
-      )}
+      <Buddy />
 
       <footer style={{ background: "var(--ink)", color: "#A9C6B7", padding: "26px 0" }}>
         <div className="container" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, fontSize: 13 }}>
-          <div><span className="display" style={{ color: "#fff", fontWeight: 700 }}>🧭 Compass<span style={{ color: "#4ade80" }}>.</span></span> — find your direction 🌍</div>
-          <div className="mono" style={{ fontSize: 11 }}>Estimates only — verify on official university & government sites. © {new Date().getFullYear()}</div>
+          <div><span className="display" style={{ color: "#fff", fontWeight: 700 }}>🧭 Compass<span style={{ color: "var(--mint)" }}>.</span></span> — every rejection is redirection 🌍</div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <a href="#/blog" style={{ textDecoration: "none" }}>Blog</a>
+            <a href="#/contact" style={{ textDecoration: "none" }}>Contact</a>
+            <a href={LINKS.telegram} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Telegram</a>
+          </div>
+          <div className="mono" style={{ fontSize: 11 }}>Estimates only — verify on official sites. © {new Date().getFullYear()}</div>
         </div>
       </footer>
     </div>
