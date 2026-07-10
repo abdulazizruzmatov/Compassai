@@ -1,8 +1,10 @@
 :root {
-  --paper: #f7faf8;
+  --paper: #f2f7f3;
   --ink: #0b3d2e;
+  --deep: #123f30;
   --accent: #16a34a;
-  --orange: #16a34a; /* legacy alias */
+  --orange: #16a34a;
+  --mint: #4ade80;
   --green: #14724a;
   --slate: #55685e;
   --card: #ffffff;
@@ -21,7 +23,7 @@ h1, h2, h3, .display, .btn, .logo { font-family: "Space Grotesk", "Inter", sans-
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 .label { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--slate); text-transform: uppercase; margin-bottom: 6px; }
 
-.container { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+.container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 .section { padding: 56px 0; }
 .section-title { font-weight: 700; font-size: 34px; letter-spacing: -0.02em; margin: 0 0 6px; }
 .section-sub { color: var(--slate); font-size: 15px; margin: 0 0 24px; max-width: 620px; line-height: 1.5; }
@@ -32,12 +34,13 @@ h1, h2, h3, .display, .btn, .logo { font-family: "Space Grotesk", "Inter", sans-
 .btn-orange, .btn-accent { background: var(--accent); color: #fff; }
 .btn-ink { background: var(--ink); color: #fff; }
 .btn-ghost { background: transparent; border: 1.5px solid var(--ink); color: var(--ink); }
+.btn-ghost-light { background: transparent; border: 1.5px solid rgba(255,255,255,0.6); color: #fff; }
 .btn:disabled { background: var(--line); cursor: not-allowed; }
 
 .input { width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-family: "Inter", sans-serif; font-size: 15px; outline: none; }
 .input:focus { border-color: var(--accent); }
 
-.chip { padding: 8px 14px; border-radius: 999px; cursor: pointer; border: 1.5px solid var(--line); background: transparent; color: var(--ink); font-family: "Inter", sans-serif; font-size: 13px; font-weight: 600; }
+.chip { padding: 8px 14px; border-radius: 999px; cursor: pointer; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-family: "Inter", sans-serif; font-size: 13px; font-weight: 600; }
 .chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -45,11 +48,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ---- nav ---- */
-.nav-link { text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 8px; color: var(--ink); }
-.nav-link.active, .nav-link:hover { background: #e8f3ec; }
+.nav-link { text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 8px; color: var(--ink); white-space: nowrap; }
+.nav-link.active, .nav-link:hover { background: #e3efe7; }
+
+/* ---- dark hero ---- */
+.hero-dark { background: linear-gradient(160deg, #0b3d2e 0%, #123f30 60%, #16523d 100%); color: #fff; }
 
 /* ---- deadline marquee ---- */
-.marquee { overflow: hidden; background: var(--ink); color: #fff; border-top: 1px solid #1d5643; border-bottom: 1px solid #1d5643; }
+.marquee { overflow: hidden; background: var(--deep); color: #fff; border-top: 1px solid #1d5643; border-bottom: 1px solid #1d5643; }
 .marquee-track { display: flex; gap: 0; width: max-content; animation: scroll-left 45s linear infinite; }
 .marquee:hover .marquee-track { animation-play-state: paused; }
 .marquee-item { display: flex; align-items: center; gap: 10px; padding: 12px 26px; white-space: nowrap; font-family: "IBM Plex Mono", monospace; font-size: 13px; border-right: 1px solid #1d5643; }
@@ -57,23 +63,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes blink { 50% { opacity: 0.25; } }
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
 /* ---- compass hero animation ---- */
-.compass-wrap { position: relative; width: 420px; height: 420px; max-width: 90vw; max-height: 90vw; margin: 0 auto; }
-.compass-face { position: absolute; inset: 15%; border-radius: 50%; background: var(--ink); box-shadow: 0 18px 50px rgba(11,61,46,0.35), inset 0 0 0 6px #1d5643; display: grid; place-items: center; }
+.compass-wrap { position: relative; width: 430px; height: 430px; max-width: 92vw; max-height: 92vw; margin: 0 auto; animation: floaty 6s ease-in-out infinite; }
+.compass-face { position: absolute; inset: 17%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #16523d, #0b3d2e 70%); box-shadow: 0 18px 50px rgba(0,0,0,0.45), inset 0 0 0 6px #1d5643, inset 0 0 40px rgba(74,222,128,0.12); display: grid; place-items: center; }
+.compass-ring { position: absolute; inset: 12%; border-radius: 50%; border: 1.5px dashed rgba(74,222,128,0.35); animation: spin-slow 30s linear infinite; }
 .compass-letter { position: absolute; color: #A9C6B7; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 15px; }
 .needle { position: absolute; inset: 0; display: grid; place-items: center; animation: needle-sweep 10s ease-in-out infinite; transform-origin: center; }
-.needle svg { display: block; }
 @keyframes needle-sweep {
   0% { transform: rotate(0deg); } 20% { transform: rotate(140deg); }
   40% { transform: rotate(80deg); } 60% { transform: rotate(250deg); }
   80% { transform: rotate(200deg); } 100% { transform: rotate(360deg); }
 }
-.orbit { position: absolute; inset: 0; animation: spin-slow 46s linear infinite; }
-.orbit-chip { position: absolute; top: 50%; left: 50%; animation: spin-slow-rev 46s linear infinite; }
-.orbit-chip span { display: inline-block; transform: translate(-50%, -50%); background: #fff; border: 1.5px solid var(--line); color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(11,61,46,0.10); }
+.orbit { position: absolute; inset: 0; animation: spin-slow 40s linear infinite; }
+.orbit-chip { position: absolute; top: 50%; left: 50%; animation: spin-slow-rev 40s linear infinite; }
+.orbit-chip span { display: inline-block; transform: translate(-50%, -50%); background: rgba(255,255,255,0.97); border: 1.5px solid var(--line); color: var(--ink); border-radius: 999px; padding: 7px 13px; font-size: 12.5px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes spin-slow-rev { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+
+/* ---- uni slider ---- */
+.slider { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px 2px 14px; scrollbar-width: thin; }
+.slider::-webkit-scrollbar { height: 8px; }
+.slider::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+.slide { scroll-snap-align: start; flex: 0 0 260px; }
+.slide-head { background: var(--ink); color: #fff; border-radius: 12px 12px 0 0; padding: 16px; min-height: 86px; display: flex; flex-direction: column; justify-content: center; }
+
+/* ---- scholarship graveyard-style card ---- */
+.sch-head { border-radius: 12px 12px 0 0; padding: 18px 16px; color: #fff; display: flex; align-items: center; justify-content: space-between; background: var(--ink); }
 
 /* ---- floating advisor button ---- */
 .fab { position: fixed; right: 22px; bottom: 22px; z-index: 60; width: 62px; height: 62px; border-radius: 50%;
@@ -84,11 +101,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.blog-layout { display: grid; grid-template-columns: 300px 1fr; gap: 22px; align-items: start; }
 
-@media (max-width: 760px) {
-  .grid2, .grid3 { grid-template-columns: 1fr; }
+@media (max-width: 800px) {
+  .grid2, .grid3, .blog-layout { grid-template-columns: 1fr; }
   .grid4 { grid-template-columns: 1fr 1fr; }
-  .hero-h1 { font-size: 40px !important; }
+  .hero-h1 { font-size: 38px !important; }
   .nav-links { display: none !important; }
   .compass-wrap { width: 320px; height: 320px; }
 }
