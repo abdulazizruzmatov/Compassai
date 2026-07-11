@@ -445,19 +445,20 @@ function UniCard({ u, home, idx, tracked, onTrack, session, openAuth }) {
 function HomePage() {
   return (
     <>
-      <section className="hero-dark" style={{ padding: "64px 0 56px" }}>
-        <div className="container grid2" style={{ alignItems: "center" }}>
-          <div>
-            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.18em", color: "var(--mint)", fontWeight: 700 }}>🇺🇿 → 🌍 EVERY REJECTION IS REDIRECTION</div>
-            <h1 className="hero-h1" style={{ fontWeight: 700, fontSize: 54, lineHeight: 1.02, letterSpacing: "-0.03em", margin: "14px 0", color: "#fff" }}>
-              Find your direction.<br /><span style={{ color: "var(--mint)" }}>Aim higher.</span>
+      <section className="hero-milk">
+        <div className="giant-word" aria-hidden="true"><span>com</span><span className="gw2">pass</span></div>
+        <div className="container grid2" style={{ alignItems: "center", position: "relative", zIndex: 2 }}>
+          <div className="hero-copy">
+            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.18em", color: "var(--accent)", fontWeight: 700 }}>🇺🇿 → 🌍 EVERY REJECTION IS REDIRECTION</div>
+            <h1 className="hero-h1" style={{ fontWeight: 700, fontSize: 58, lineHeight: 1.0, letterSpacing: "-0.035em", margin: "16px 0", color: "var(--ink)" }}>
+              Find your<br />direction<span style={{ color: "var(--accent)" }}>.</span>
             </h1>
-            <p style={{ color: "#C9DED2", fontSize: 17, maxWidth: 480, margin: "0 0 26px", lineHeight: 1.55 }}>
-              Compass turns "I want to be a game developer 🎮" into degrees explained, real universities, honest chances, visa steps, living costs and scholarships — free, no agency.
+            <p style={{ color: "var(--slate)", fontSize: 16.5, maxWidth: 440, margin: "0 0 28px", lineHeight: 1.6, fontFamily: "Inter, sans-serif" }}>
+              Compass turns "I want to be a game developer 🎮" into degrees explained, real universities, honest chances, visa steps and scholarships — free, no agency.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button className="btn btn-accent" style={{ fontSize: 16, padding: "16px 26px" }} onClick={() => go("advisor")}>🧭 Who do you wanna be? →</button>
-              <button className="btn btn-ghost-light" onClick={() => go("world")}>🌍 Explore countries</button>
+              <button className="btn btn-accent pill-btn" onClick={() => go("advisor")}>Who do you wanna be? →</button>
+              <button className="btn pill-btn pill-ghost" onClick={() => go("world")}>🌍 Explore countries</button>
             </div>
           </div>
           <CompassHero />
