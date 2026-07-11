@@ -136,6 +136,34 @@ function FounderBar() {
   );
 }
 
+
+/* ---------------- study loading animation ---------------- */
+function StudyLoader({ title }) {
+  const MSGS = ["Reading your answers… 📖", "Comparing 1,000 universities… 🏛️", "Checking scholarships… 🎓", "Calculating your chances… 🧮", "Checking visa rules… 🛂", "Packing your plan… 🎒"];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % MSGS.length), 1600);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div style={{ textAlign: "center", padding: "70px 0" }}>
+      <div className="study-row" aria-hidden="true">
+        {["📚", "✍️", "🧮", "💡", "🎓"].map((e, j) => (
+          <span key={j} className="study-emoji" style={{ animationDelay: `${j * 0.15}s` }}>{e}</span>
+        ))}
+      </div>
+      <div className="fly-track" aria-hidden="true">
+        <span className="fly-plane">✈️</span>
+        <span className="fly-goal">🎓</span>
+      </div>
+      <div className="display" style={{ fontWeight: 700, fontSize: 30, margin: "18px 0 8px" }}>{title} <span style={{ color: "var(--accent)" }}>→</span></div>
+      <div className="mono" style={{ fontSize: 13.5, letterSpacing: "0.08em", color: "var(--slate)" }} key={i}>
+        <span style={{ animation: "rise .4s both" }}>{MSGS[i]}</span>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- compass hero ---------------- */
 function CompassHero() {
   const R = 48;
@@ -600,11 +628,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
           </div>
         )}
 
-        {phase === "thinking" && (
-          <div style={{ textAlign: "center", padding: "90px 0" }}>
-            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>YOUR CONSULTANT IS READING YOUR PROFILE… 🤔</div>
-          </div>
-        )}
+        {phase === "thinking" && <StudyLoader title="Your consultant is thinking" />}
 
         {phase === "consult" && consult && (
           <div style={{ display: "grid", gap: 18, animation: "rise .4s both" }}>
@@ -635,12 +659,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
           </div>
         )}
 
-        {phase === "loading" && (
-          <div style={{ textAlign: "center", padding: "90px 0" }}>
-            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>READING YOUR ANSWERS… BUILDING YOUR ROUTE 🛰️</div>
-            <div className="display" style={{ fontWeight: 700, fontSize: 34, marginTop: 14 }}>Plotting your direction <span style={{ color: "var(--accent)" }}>→</span></div>
-          </div>
-        )}
+        {phase === "loading" && <StudyLoader title="Plotting your direction" />}
 
         {phase === "results" && plan && (
           <div style={{ display: "grid", gap: 18 }}>
@@ -804,11 +823,7 @@ function WorldPage() {
 
       <section className="section" id="world-results">
         <div className="container">
-          {busy && (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <div className="mono" style={{ animation: "blink 1.1s infinite", letterSpacing: "0.2em", color: "var(--slate)" }}>SCANNING {country?.toUpperCase()} UNIVERSITIES… 🛰️</div>
-            </div>
-          )}
+          {busy && <StudyLoader title={`Scanning ${country || ""} universities`} />}
           {error && <div style={{ color: "var(--red)", fontWeight: 700, textAlign: "center" }}>{error}</div>}
 
           {data && (
