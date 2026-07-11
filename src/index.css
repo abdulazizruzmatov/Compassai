@@ -114,3 +114,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---- auto-scrolling logo slider ---- */
+.autoslide { overflow: hidden; width: 100%; }
+.autoslide-track { display: flex; gap: 14px; width: max-content; animation: scroll-left 60s linear infinite; padding: 6px 20px 10px; }
+.autoslide:hover .autoslide-track { animation-play-state: paused; }
+.pill-card { display: flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid var(--line); border-radius: 999px; padding: 10px 22px 10px 12px; text-decoration: none; min-width: 300px; box-shadow: 0 4px 14px rgba(11,61,46,0.07); }
+.pill-card img, .pill-fallback { width: 46px; height: 46px; border-radius: 50%; object-fit: contain; background: #f2f7f3; border: 1px solid var(--line); place-items: center; font-size: 22px; flex-shrink: 0; }
+
+/* ---- scholarship tickets ---- */
+.ticket { display: flex; align-items: stretch; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; text-decoration: none; }
+.ticket:hover { border-color: var(--accent); }
+.ticket-band { width: 70px; flex-shrink: 0; background: var(--ink); display: grid; place-items: center; font-size: 30px; }
+.ticket-right { padding: 14px 18px; border-left: 2px dashed var(--line); display: flex; flex-direction: column; justify-content: center; min-width: 150px; }
