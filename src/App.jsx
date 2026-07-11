@@ -22,9 +22,10 @@ const SPONSOR = {
 };
 const FOUNDER = {
   name: "Abdulaziz Ruzmatov",
-  role: "Researcher & Founder · 🇺🇿 Uzbekistan → 🇬🇧 London",
-  bio: "Founder of MistakeMap and Compass. Ex-marketing agency owner, now a London-based researcher on startup ecosystems and founder education. Built Compass so students never have to pay a consultant to find their path — because every rejection is just redirection.",
-  stats: [["MistakeMap", "Founder"], ["2 Countries", "UK & Uzbekistan"], ["Active", "Startup Research"]],
+  role: "Researcher & Ex-Founder · 🇺🇿 Uzbekistan → 🇬🇧 London",
+  photo: "/founder.jpg", // put your photo at public/founder.jpg (or paste any image URL here)
+  bio: "Researcher and ex-founder. Former marketing agency owner, now a London-based researcher on education and startup ecosystems. Built Compass so students never have to pay a consultant to find their path — because every rejection is just redirection.",
+  stats: [["6+ Years", "Marketing & Business"], ["2 Countries", "UK & Uzbekistan"], ["Active", "Researcher"]],
 };
 const BLOG_POSTS = [];
 /* ======================================================= */
@@ -123,7 +124,9 @@ function FounderBar() {
   return (
     <div style={{ background: "#0e4634", color: "#DCEAE2", borderTop: "1px solid #1d5643" }}>
       <div className="container" style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 20px", flexWrap: "wrap" }}>
-        <div style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", border: "2px solid rgba(255,255,255,0.15)", display: "grid", placeItems: "center", fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)" }}>AR</div>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, overflow: "hidden", border: "2px solid rgba(255,255,255,0.15)", background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", display: "grid", placeItems: "center", fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)", fontSize: 15 }}>
+          <img src={FOUNDER.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.currentTarget.remove(); }} />
+        </div>
         <div style={{ flex: 1, minWidth: 200, fontSize: 13.5, lineHeight: 1.4 }}>
           <b style={{ color: "#fff" }}>Built by {FOUNDER.name}</b> — {FOUNDER.role}
         </div>
@@ -1137,7 +1140,9 @@ function ContactPage() {
 
       <section className="hero-dark" style={{ padding: "56px 0" }}>
         <div className="container" style={{ display: "flex", gap: 30, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ width: 150, height: 150, borderRadius: "50%", flexShrink: 0, background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", border: "4px solid rgba(255,255,255,0.15)", display: "grid", placeItems: "center", fontSize: 48, fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)" }}>AR</div>
+          <div style={{ width: 150, height: 150, borderRadius: "50%", flexShrink: 0, overflow: "hidden", border: "4px solid rgba(255,255,255,0.15)", background: "radial-gradient(circle at 35% 30%, #16523d, #0b3d2e)", display: "grid", placeItems: "center", fontSize: 48, fontFamily: "Space Grotesk, sans-serif", fontWeight: 700, color: "var(--mint)" }}>
+            <img src={FOUNDER.photo} alt={FOUNDER.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.currentTarget.remove(); }} />
+          </div>
           <div style={{ flex: 1, minWidth: 260 }}>
             <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "#A9C6B7" }}>BUILT & FOUNDED BY</div>
             <div className="display" style={{ fontWeight: 700, fontSize: 32, color: "#fff", margin: "6px 0" }}>{FOUNDER.name}</div>
