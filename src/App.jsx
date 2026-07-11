@@ -932,19 +932,26 @@ function ScholarshipsPage() {
         <div className="container">
           <h2 className="section-title" style={{ fontSize: 24 }}>🏆 The famous ones</h2>
           <div style={{ color: "var(--slate)", fontSize: 14, marginBottom: 14 }}>Showing <b>{list.length}</b> of {SCHOLARSHIPS.length}</div>
-          <div style={{ display: "grid", gap: 12 }}>
-            {list.map((s) => (
-              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="ticket">
-                <div className="ticket-band">{s.emoji}</div>
-                <div style={{ flex: 1, minWidth: 200, padding: "14px 16px" }}>
-                  <div className="display" style={{ fontWeight: 700, fontSize: 17 }}>{s.name}</div>
-                  <div style={{ color: "var(--slate)", fontSize: 13 }}>{s.country} · {s.level}</div>
-                  <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 14, marginTop: 6 }}>💸 {s.coverage}</div>
+          <div className="grave-grid">
+            {list.map((s, i) => (
+              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="grave-card">
+                <div className="grave-head" style={{ background: ["#101828", "#1e3a8a", "#1d5d75", "#111111", "#5b1a1a", "#173a2a", "#2e1e6b", "#7f1d1d"][i % 8] }}>
+                  <div className="grave-name">{s.name}</div>
+                  <span className="grave-pill">🎓 {/full/i.test(s.coverage) ? "Full Ride" : "Funded"}</span>
                 </div>
-                <div className="ticket-right">
-                  <div className="mono" style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--slate)" }}>DEADLINE</div>
-                  <div className="mono" style={{ fontSize: 14, color: "var(--accent)", fontWeight: 700 }}>⏰ {s.deadline}</div>
-                  <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13, marginTop: 6 }}>Apply →</div>
+                <div style={{ padding: "16px 18px" }}>
+                  <div style={{ fontWeight: 800, fontSize: 16.5, fontFamily: "Inter, sans-serif" }}>
+                    Why {s.name}: <span style={{ color: "var(--slate)" }}>{s.country}</span>
+                  </div>
+                  <p style={{ color: "#475467", fontSize: 14, lineHeight: 1.5, margin: "8px 0 12px" }}>{s.coverage} — for {s.level} students.</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span className="tag-green">{s.level}</span>
+                    <span className="tag-red">💸 {/full/i.test(s.coverage) ? "100% funded" : "Partial+"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 12 }}>
+                    <span className="mono" style={{ fontSize: 12.5, color: "var(--slate)" }}>⏰ {s.deadline}</span>
+                    <span style={{ color: "var(--green)", fontWeight: 700, fontSize: 14, fontFamily: "Inter, sans-serif" }}>Official page →</span>
+                  </div>
                 </div>
               </a>
             ))}
