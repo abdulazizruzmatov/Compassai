@@ -137,3 +137,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .grave-pill { background: rgba(0,0,0,0.35); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; font-family: "Inter", sans-serif; }
 .tag-green { border: 1.5px solid #abefc6; background: #ecfdf3; color: #067647; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; font-family: "Inter", sans-serif; }
 .tag-red { border: 1.5px solid #fecdca; background: #fef3f2; color: #b42318; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; font-family: "Inter", sans-serif; }
+
+/* ---- consultant question rows (readable, Gen-Z friendly) ---- */
+.q-row { display: flex; gap: 14px; align-items: flex-start; background: #f7faf8; border: 1.5px solid var(--line); border-radius: 16px; padding: 16px; }
+.q-num { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; font-family: "Inter", sans-serif; font-weight: 800; font-size: 16px; display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(22,163,74,0.35); }
+.q-text { font-family: "Inter", sans-serif; font-weight: 600; font-size: 15.5px; line-height: 1.55; letter-spacing: 0; text-transform: none; color: var(--ink); margin-bottom: 10px; }
+.q-input { border-radius: 12px; font-size: 15px; }
+
+/* ---- sign-in unlock button ---- */
+.unlock-btn { margin-top: 14px; width: 100%; text-align: left; background: linear-gradient(90deg, #ecfdf3, #f0fdf4); border: 1.5px dashed var(--accent); color: var(--ink); border-radius: 12px; padding: 13px 16px; font-family: "Inter", sans-serif; font-size: 14px; cursor: pointer; }
+.unlock-btn:hover { background: #e3f7ea; }
