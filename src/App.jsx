@@ -575,55 +575,59 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
         <p className="section-sub">Tell it your mind. It answers like an agency would — degrees explained, honest chances against your scores, visa steps, real costs, documents — for free.</p>
 
         {phase === "form" && (
-          <div className="card" style={{ padding: "22px 22px 26px", boxShadow: "0 2px 10px rgba(11,61,46,0.06)" }}>
-            <div className="label">✈️ Flight plan</div>
-            <div style={{ display: "grid", gap: 18, marginTop: 10 }}>
+          <div className="card" style={{ padding: "30px 30px 34px", boxShadow: "0 2px 16px rgba(11,61,46,0.05)", borderRadius: 18 }}>
+            <div className="display" style={{ fontWeight: 700, fontSize: 21 }}>Tell us about you</div>
+            <p style={{ color: "var(--slate)", fontSize: 14, margin: "4px 0 24px", fontFamily: "Inter, sans-serif" }}>Two minutes. The more honest you are, the better your plan.</p>
+
+            <div style={{ display: "grid", gap: 20 }}>
               <div>
-                <div className="label">I want to become… 💭</div>
-                <input className="input" value={form.goal} onChange={(e) => set("goal", e.target.value)} placeholder="e.g. a game developer, a surgeon, a startup founder" />
+                <div className="f-label">I want to become</div>
+                <input className="input f-input" value={form.goal} onChange={(e) => set("goal", e.target.value)} placeholder="a game developer, a surgeon, a startup founder…" />
               </div>
               <div>
-                <div className="label">My interests ❤️</div>
-                <textarea className="input" style={{ minHeight: 74, resize: "vertical" }} value={form.interests} onChange={(e) => set("interests", e.target.value)} placeholder="e.g. I love football analytics, coding, and making videos" />
+                <div className="f-label">My interests</div>
+                <textarea className="input f-input" style={{ minHeight: 72, resize: "vertical" }} value={form.interests} onChange={(e) => set("interests", e.target.value)} placeholder="football analytics, coding, making videos…" />
               </div>
               <div className="grid2">
                 <div>
-                  <div className="label">Home country 🏠</div>
-                  <input className="input" value={form.home} onChange={(e) => set("home", e.target.value)} placeholder="e.g. Uzbekistan" />
+                  <div className="f-label">Home country</div>
+                  <input className="input f-input" value={form.home} onChange={(e) => set("home", e.target.value)} placeholder="Uzbekistan" />
                 </div>
                 <div>
-                  <div className="label">Study level 📚</div>
-                  <select className="input" value={form.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
+                  <div className="f-label">Study level</div>
+                  <select className="input f-input" value={form.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
                 </div>
               </div>
               <div className="grid2">
                 <div>
-                  <div className="label">IELTS / English score 🗣️ (or empty)</div>
-                  <input className="input" value={form.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="e.g. 6.5, or 'not taken yet'" />
+                  <div className="f-label">IELTS / English <span className="f-hint">optional</span></div>
+                  <input className="input f-input" value={form.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="6.5, or 'not taken yet'" />
                 </div>
                 <div>
-                  <div className="label">GPA / grades 📊</div>
-                  <input className="input" value={form.gpa} onChange={(e) => set("gpa", e.target.value)} placeholder="e.g. 4.2/5, or A-levels AAB" />
+                  <div className="f-label">GPA / grades <span className="f-hint">optional</span></div>
+                  <input className="input f-input" value={form.gpa} onChange={(e) => set("gpa", e.target.value)} placeholder="4.2/5, or A-levels AAB" />
                 </div>
               </div>
               <div>
-                <div className="label">Certificates & achievements 🏅 (they strengthen you!)</div>
-                <textarea className="input" style={{ minHeight: 60, resize: "vertical" }} value={form.certs} onChange={(e) => set("certs", e.target.value)} placeholder="e.g. SAT 1350, olympiad medal, coding bootcamp, volunteering…" />
+                <div className="f-label">Certificates & achievements <span className="f-hint">they strengthen you</span></div>
+                <textarea className="input f-input" style={{ minHeight: 58, resize: "vertical" }} value={form.certs} onChange={(e) => set("certs", e.target.value)} placeholder="SAT 1350, olympiad medal, coding bootcamp, volunteering…" />
               </div>
-              <div>
-                <div className="label">Budget 💰</div>
+
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+                <div className="f-label">Budget per year</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {BUDGETS.map((b) => <button key={b} className={`chip ${form.budget === b ? "on" : ""}`} onClick={() => set("budget", b)}>{b}</button>)}
                 </div>
               </div>
               <div>
-                <div className="label">Where in the world 🗺️</div>
+                <div className="f-label">Where in the world</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {REGIONS.map((r) => <button key={r} className={`chip ${form.regions.includes(r) ? "on" : ""}`} onClick={() => toggleRegion(r)}>{r}</button>)}
                 </div>
               </div>
-              {error && <div style={{ color: "var(--red)", fontWeight: 700, fontSize: 14 }}>{error}</div>}
-              <button className="btn btn-accent" style={{ padding: "16px 20px", fontSize: 16 }} onClick={run} disabled={!ready}>BUILD MY PLAN →</button>
+
+              {error && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: 14, fontFamily: "Inter, sans-serif" }}>{error}</div>}
+              <button className="btn btn-accent f-cta" onClick={run} disabled={!ready}>Build my plan →</button>
             </div>
           </div>
         )}
