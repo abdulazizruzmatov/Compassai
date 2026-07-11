@@ -166,3 +166,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @keyframes study-bounce { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-16px) rotate(-8deg); } }
 .route-line { width: 220px; height: 0; margin: 18px auto 0; border-top: 3px dashed var(--accent); animation: route-dash 1.2s linear infinite; }
 @keyframes route-dash { from { stroke-dashoffset: 0; transform: translateX(0); } 50% { transform: translateX(6px); } to { transform: translateX(0); } }
+
+/* ---- minimal professional form ---- */
+.f-label { font-family: "Inter", sans-serif; font-size: 13.5px; font-weight: 600; color: var(--ink); letter-spacing: 0; text-transform: none; margin-bottom: 7px; }
+.f-hint { color: #98a8a0; font-weight: 500; font-size: 12.5px; margin-left: 6px; }
+.f-input { border-radius: 12px; background: #fbfdfc; border-color: #e2ebe6; font-size: 15px; }
+.f-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+.f-input::placeholder { color: #a9b8b0; }
+.f-cta { padding: 16px; font-size: 16px; border-radius: 12px; letter-spacing: 0; }
+.chip.on { background: var(--accent); border-color: var(--accent); }
