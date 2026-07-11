@@ -324,7 +324,7 @@ function UniSlider() {
 }
 
 /* ---------------- rich uni card (advisor v2) ---------------- */
-function UniCard({ u, home, idx, tracked, onTrack }) {
+function UniCard({ u, home, idx, tracked, onTrack, session, openAuth }) {
   const isTracked = tracked.some((t) => (t.uni?.name || t.name) === u.name);
   const [open, setOpen] = useState(false);
   return (
@@ -369,9 +369,15 @@ function UniCard({ u, home, idx, tracked, onTrack }) {
           </div>
         )}
 
-        <button onClick={() => setOpen(!open)} style={{ marginTop: 14, background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 14, padding: 0 }}>
-          {open ? "▲ Hide" : "▼ Visa steps · documents · work rules"}
-        </button>
+        {session ? (
+          <button onClick={() => setOpen(!open)} style={{ marginTop: 14, background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 14, padding: 0 }}>
+            {open ? "▲ Hide" : "▼ Visa steps · documents · work rules"}
+          </button>
+        ) : (
+          <button onClick={openAuth} className="unlock-btn">
+            🔒 Unlock visa steps, documents & work rules — <b>free, sign in</b>
+          </button>
+        )}
 
         {open && (
           <div style={{ marginTop: 10, display: "grid", gap: 10, animation: "rise .3s both" }}>
@@ -487,7 +493,7 @@ function HomePage() {
   );
 }
 
-function AdvisorPage({ tracked, track, session }) {
+function AdvisorPage({ tracked, track, session, openAuth }) {
   const saved = loadProfile();
   const [form, setForm] = useState({ goal: saved.goal || "", interests: saved.interests || "", level: saved.level || "Bachelor's", home: saved.home || "", budget: saved.budget || BUDGETS[2], regions: saved.regions || [], ielts: saved.ielts || "", gpa: saved.gpa || "", certs: saved.certs || "" });
   const [phase, setPhase] = useState("form");
@@ -603,14 +609,17 @@ function AdvisorPage({ tracked, track, session }) {
               <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "var(--mint)" }}>🧭 YOUR CONSULTANT THINKS…</div>
               <p style={{ fontSize: 15.5, lineHeight: 1.65, color: "#DCEAE2", margin: "10px 0 0" }}>{consult.reflection}</p>
             </div>
-            <div className="card" style={{ padding: 22 }}>
-              <div className="display" style={{ fontWeight: 700, fontSize: 20 }}>Before I recommend — tell me 💬</div>
-              <p style={{ color: "var(--slate)", fontSize: 13.5, margin: "4px 0 16px" }}>A good consultant asks first. Short answers are fine.</p>
+            <div className="card" style={{ padding: 24, borderTop: "4px solid var(--accent)" }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 22 }}>Real talk — 3 quick questions 💬</div>
+              <p style={{ color: "var(--slate)", fontSize: 14.5, margin: "6px 0 18px", fontFamily: "Inter, sans-serif" }}>Answer like you're texting a friend. No wrong answers — this just makes your plan actually <i>yours</i>. ✌️</p>
               <div style={{ display: "grid", gap: 14 }}>
                 {(consult.questions || []).map((q, i) => (
-                  <div key={i}>
-                    <div className="label">{i + 1}. {q}</div>
-                    <input className="input" value={answers[i] || ""} onChange={(e) => setAnswers((a) => a.map((x, j) => (j === i ? e.target.value : x)))} placeholder="your answer…" />
+                  <div key={i} className="q-row">
+                    <div className="q-num">{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <div className="q-text">{q}</div>
+                      <input className="input q-input" value={answers[i] || ""} onChange={(e) => setAnswers((a) => a.map((x, j) => (j === i ? e.target.value : x)))} placeholder="type it like a text message…" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -687,7 +696,7 @@ function AdvisorPage({ tracked, track, session }) {
               </div>
             )}
 
-            {unis.map((u, i) => <UniCard key={u.name + i} u={u} home={form.home} idx={i % 3} tracked={tracked} onTrack={track} />)}
+            {unis.map((u, i) => <UniCard key={u.name + i} u={u} home={form.home} idx={i % 3} tracked={tracked} onTrack={track} session={session} openAuth={openAuth} />)}
             {error && <div style={{ color: "var(--red)", fontWeight: 700, fontSize: 14, textAlign: "center" }}>{error}</div>}
 
             <button className="btn btn-ghost" style={{ padding: 15 }} onClick={loadMore} disabled={more}>{more ? "Searching… 🛰️" : "➕ Show 3 more universities"}</button>
@@ -1228,7 +1237,7 @@ export default function App() {
       </header>
 
       {page === "home" && <HomePage />}
-      {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} />}
+      {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} openAuth={() => setAuthOpen(true)} />}
       {page === "world" && <WorldPage />}
       {page === "scholarships" && <ScholarshipsPage />}
       {page === "tracker" && <TrackerPage tracked={tracked} updateTrack={updateTrack} removeTrack={removeTrack} session={session} />}
