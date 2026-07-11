@@ -53,8 +53,8 @@ function usePage() {
 const go = (p) => (window.location.hash = `/${p}`);
 
 /* ---------------- shared profile (used by Advisor, World, Buddy) ---------------- */
-const loadProfile = () => { try { return JSON.parse(localStorage.getItem("compass-profile") || "{}"); } catch { return {}; } };
-const saveProfile = (p) => localStorage.setItem("compass-profile", JSON.stringify(p));
+const loadProfile = () => { try { return JSON.parse(sessionStorage.getItem("compass-profile") || "{}"); } catch { return {}; } };
+const saveProfile = (p) => sessionStorage.setItem("compass-profile", JSON.stringify(p));
 
 /* ---------------- AI ---------------- */
 const AI_GUARD = `You are Compass, an expert university-admissions and study-abroad advisor ONLY. You act like a specialist professor of international admissions. You ONLY discuss: universities, degrees, courses, admissions, acceptance chances, scholarships, student visas, application documents, English tests (IELTS/TOEFL), living costs for students, and student work regulations. If asked anything outside study-abroad, politely refuse in one line and steer back. Be accurate, specific and encouraging (failure is a step to success). Never invent fake universities.`;
@@ -75,6 +75,13 @@ function parseJSON(text) {
   return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
 }
 
+function consultPrompt(form) {
+  return `A student says: goal "${form.goal}", interests "${form.interests}", level ${form.level}, home ${form.home}, budget ${form.budget}, IELTS ${form.ielts || "none"}, GPA ${form.gpa || "?"}, certificates: ${form.certs || "none"}.
+Act like a thoughtful human education consultant meeting them for the first time. Do NOT give universities yet.
+Respond ONLY valid JSON:
+{"reflection":"4-5 sentences: reflect their goal back, honest pros AND cons of this path for someone like them, one alternative path worth considering","questions":["3 short personal questions a good consultant would ask before recommending (about motivation, constraints, preferences)"]}`;
+}
+
 function planPrompt(form, excludeNames) {
   return `You are an expert international education advisor replacing a paid agency. Student profile:
 - Wants to become: ${form.goal}
@@ -86,12 +93,14 @@ function planPrompt(form, excludeNames) {
 - IELTS (or none yet): ${form.ielts || "not taken"}
 - GPA / grades: ${form.gpa || "not given"}
 - Certificates & achievements: ${form.certs || "none listed"}
+${form.answers ? `- Consultation answers (their own words): ${form.answers}` : ""}
 ${excludeNames.length ? `- Already suggested, DO NOT repeat: ${excludeNames.join("; ")}` : ""}
 
 Recommend exactly 3 real universities, best-fit for this exact profile and budget. Use realistic, current tuition figures. Assess honestly against their scores — like an agency would, but free.
 
 Respond with ONLY valid JSON, no markdown, exactly:
 {"direction":{"title":"career title","summary":"2-3 sentences why this path fits their mind and interests","degrees":[{"name":"degree","why":"one line why this degree"}]},
+"resources":[{"type":"YouTube","name":"real channel/playlist","why":"one line"},{"type":"Course","name":"real course + platform","why":"one line"},{"type":"Book","name":"real book + author","why":"one line"},{"type":"Community","name":"real community/olympiad","why":"one line"}],
 "skills":{"strong":["what already strengthens their application, incl. their certificates"],"gaps":[{"skill":"what is missing","learn":"exactly what to do/learn, with a number or resource"}],"advice":"3 sentences of honest agency-style advice; motivating: failure is a step to success"},
 "unis":[{"name":"","country":"","city":"","program":"","rank":"QS ...","fit":"happy|mid|sad","fitWhy":"one line vs their scores","tuition":"$X/yr (realistic)","living":{"rent":"$/mo","weekly":"$ groceries+transport/week"},"work":"work rules for students, one line","visa":{"type":"","funds":"proof of funds","steps":["step1","step2","step3"]},"docs":["required documents"],"sch":[{"n":"scholarship","c":"coverage"}],"apply":"application portal url","web":"official url","email":"admissions email","why":"one line why this uni"}]}`;
 }
@@ -105,7 +114,8 @@ List the 14 best universities in ${country} for this student, ranked by realisti
 
 Respond ONLY valid JSON:
 {"gaps":{"now":["their current weak points, specific, e.g. IELTS 5.5"],"target":["what each must become, e.g. IELTS 7.0+"],"plan":["concrete action steps in order"]},
-"unis":[{"name":"","city":"","acceptRate":"~X%","fit":"happy|mid|sad","needs":"one line: what THEY need for THIS uni","docs":"key documents, short","why":"one line"}]}`;
+"unis":[{"name":"","city":"","lat":0.0,"lng":0.0,"acceptRate":"~X%","fit":"happy|mid|sad","needs":"one line: what THEY need for THIS uni","docs":"key documents, short","why":"one line"}]}
+lat/lng must be the real coordinates of each university campus.`;
 }
 
 
@@ -286,33 +296,26 @@ function DeadlineMarquee() {
 }
 
 function UniSlider() {
-  const ref = useRef(null);
-  const nudge = (dir) => ref.current?.scrollBy({ left: dir * 290, behavior: "smooth" });
   const sorted = [...UNIVERSITIES].filter((u) => u.qs).sort((a, b) => a.qs - b.qs);
+  const items = [...sorted, ...sorted]; // duplicate for seamless loop
   return (
     <section className="section">
       <div className="container">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <h2 className="section-title">Top universities right now 🏛️</h2>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost" style={{ padding: "8px 14px" }} onClick={() => nudge(-1)}>‹</button>
-            <button className="btn btn-ghost" style={{ padding: "8px 14px" }} onClick={() => nudge(1)}>›</button>
-          </div>
-        </div>
-        <p className="section-sub">QS World 2026 — slide through, check the deadline, apply directly.</p>
-        <div className="slider" ref={ref}>
-          {sorted.map((u) => (
-            <div key={u.name} className="slide card" style={{ overflow: "hidden" }}>
-              <div className="slide-head">
-                <div className="mono" style={{ color: "var(--mint)", fontWeight: 700, fontSize: 13 }}>QS #{u.qs}</div>
-                <div className="display" style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.15 }}>{u.name}</div>
+        <h2 className="section-title">Top universities right now 🏛️</h2>
+        <p className="section-sub">QS World 2026 — hover to pause, click to visit.</p>
+      </div>
+      <div className="autoslide">
+        <div className="autoslide-track">
+          {items.map((u, i) => (
+            <a key={u.name + i} href={u.web} target="_blank" rel="noreferrer" className="pill-card">
+              <img src={`https://logo.clearbit.com/${u.domain}`} alt="" onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "grid"; }} />
+              <span className="pill-fallback" style={{ display: "none" }}>🏛️</span>
+              <div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>QS #{u.qs} · {u.country}</div>
+                <div className="display" style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>{u.name}</div>
+                <div style={{ fontSize: 12, color: "var(--slate)" }}>{u.why}</div>
               </div>
-              <div style={{ padding: 14 }}>
-                <div style={{ color: "var(--slate)", fontSize: 13 }}>{u.country}</div>
-                <div className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, margin: "8px 0 12px" }}>⏰ {u.deadline}</div>
-                <a className="btn btn-accent" style={{ padding: "9px 13px", fontSize: 13 }} href={u.applyUrl} target="_blank" rel="noreferrer">Apply ↗</a>
-              </div>
-            </div>
+            </a>
           ))}
         </div>
       </div>
@@ -490,21 +493,33 @@ function AdvisorPage({ tracked, track, session }) {
   const [phase, setPhase] = useState("form");
   const [plan, setPlan] = useState(null);
   const [skills, setSkills] = useState(null);
+  const [resources, setResources] = useState([]);
   const [unis, setUnis] = useState([]);
   const [error, setError] = useState("");
   const [more, setMore] = useState(false);
+  const [consult, setConsult] = useState(null);
+  const [answers, setAnswers] = useState(["", "", ""]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleRegion = (r) => setForm((f) => ({ ...f, regions: f.regions.includes(r) ? f.regions.filter((x) => x !== r) : [...f.regions, r] }));
   const ready = form.goal.trim() && form.interests.trim() && form.home.trim();
 
   const run = async () => {
-    setError(""); setPhase("loading"); saveProfile(form);
+    setError(""); setPhase("thinking"); saveProfile(form);
     try {
-      const p = parseJSON(await askAI(planPrompt(form, [])));
-      setPlan(p.direction); setSkills(p.skills); setUnis(p.unis || []); setPhase("results");
+      const c = parseJSON(await askAI(consultPrompt(form)));
+      setConsult(c); setAnswers((c.questions || []).map(() => "")); setPhase("consult");
+    } catch (e) { console.error(e); setError("Couldn't reach your consultant — try again 🙏"); setPhase("form"); }
+  };
+
+  const buildPlan = async () => {
+    setError(""); setPhase("loading");
+    const withAnswers = { ...form, answers: (consult?.questions || []).map((q, i) => `${q} → ${answers[i] || "no answer"}`).join(" | ") };
+    try {
+      const p = parseJSON(await askAI(planPrompt(withAnswers, [])));
+      setPlan(p.direction); setSkills(p.skills); setResources(p.resources || []); setUnis(p.unis || []); setPhase("results");
       if (supabase && session) await supabase.from("plans").insert({ user_id: session.user.id, profile: form, result: p });
-    } catch (e) { console.error(e); setError("Couldn't build your plan — try again 🙏"); setPhase("form"); }
+    } catch (e) { console.error(e); setError("Couldn't build your plan — try again 🙏"); setPhase("consult"); }
   };
 
   const loadMore = async () => {
@@ -576,9 +591,41 @@ function AdvisorPage({ tracked, track, session }) {
           </div>
         )}
 
+        {phase === "thinking" && (
+          <div style={{ textAlign: "center", padding: "90px 0" }}>
+            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>YOUR CONSULTANT IS READING YOUR PROFILE… 🤔</div>
+          </div>
+        )}
+
+        {phase === "consult" && consult && (
+          <div style={{ display: "grid", gap: 18, animation: "rise .4s both" }}>
+            <div style={{ background: "var(--ink)", color: "#fff", borderRadius: 14, padding: "22px 24px" }}>
+              <div className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "var(--mint)" }}>🧭 YOUR CONSULTANT THINKS…</div>
+              <p style={{ fontSize: 15.5, lineHeight: 1.65, color: "#DCEAE2", margin: "10px 0 0" }}>{consult.reflection}</p>
+            </div>
+            <div className="card" style={{ padding: 22 }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 20 }}>Before I recommend — tell me 💬</div>
+              <p style={{ color: "var(--slate)", fontSize: 13.5, margin: "4px 0 16px" }}>A good consultant asks first. Short answers are fine.</p>
+              <div style={{ display: "grid", gap: 14 }}>
+                {(consult.questions || []).map((q, i) => (
+                  <div key={i}>
+                    <div className="label">{i + 1}. {q}</div>
+                    <input className="input" value={answers[i] || ""} onChange={(e) => setAnswers((a) => a.map((x, j) => (j === i ? e.target.value : x)))} placeholder="your answer…" />
+                  </div>
+                ))}
+              </div>
+              {error && <div style={{ color: "var(--red)", fontWeight: 700, fontSize: 14, marginTop: 10 }}>{error}</div>}
+              <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                <button className="btn btn-accent" style={{ padding: "14px 22px" }} onClick={buildPlan}>Now build my plan →</button>
+                <button className="btn btn-ghost" onClick={buildPlan}>Skip questions</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {phase === "loading" && (
           <div style={{ textAlign: "center", padding: "90px 0" }}>
-            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>READING YOUR PROFILE… BUILDING YOUR ROUTE 🛰️</div>
+            <div className="mono" style={{ fontSize: 14, letterSpacing: "0.2em", color: "var(--slate)", animation: "blink 1.1s infinite" }}>READING YOUR ANSWERS… BUILDING YOUR ROUTE 🛰️</div>
             <div className="display" style={{ fontWeight: 700, fontSize: 34, marginTop: 14 }}>Plotting your direction <span style={{ color: "var(--accent)" }}>→</span></div>
           </div>
         )}
@@ -622,6 +669,21 @@ function AdvisorPage({ tracked, track, session }) {
               <div className="card" style={{ padding: 20, background: "#E6F0E9", border: "none" }}>
                 <div className="label">🧭 Honest advice</div>
                 <div style={{ fontSize: 15, lineHeight: 1.6 }}>{skills.advice}</div>
+              </div>
+            )}
+
+            {resources.length > 0 && (
+              <div className="card" style={{ padding: 20 }}>
+                <div className="display" style={{ fontWeight: 700, fontSize: 20, marginBottom: 12 }}>📚 Learn while you apply</div>
+                <div className="grid2">
+                  {resources.map((r, i) => (
+                    <div key={i} style={{ border: "1.5px solid var(--line)", borderRadius: 12, padding: "12px 14px" }}>
+                      <div className="mono" style={{ fontSize: 10.5, letterSpacing: "0.12em", color: "var(--accent)", fontWeight: 700 }}>{{ YouTube: "▶️ YOUTUBE", Course: "🎓 COURSE", Book: "📖 BOOK", Community: "🌍 COMMUNITY" }[r.type] || "📌 " + (r.type || "").toUpperCase()}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14.5, margin: "4px 0 2px" }}>{r.name}</div>
+                      <div style={{ color: "var(--slate)", fontSize: 13 }}>{r.why}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -673,7 +735,7 @@ function WorldPage() {
     saveProfile({ ...loadProfile(), ...prof });
     // fly the globe to the clicked country
     const target = COUNTRY_COSTS.find((x) => x.name === c);
-    if (globeRef.current && target) globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: 1.6 }, 1000);
+    if (globeRef.current && target) globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: 0.7 }, 1200);
     try { setData(parseJSON(await askAI(worldPrompt(c, prof)))); }
     catch (e) { console.error(e); setError("Couldn't load — try again 🙏"); }
     setBusy(false);
@@ -710,13 +772,13 @@ function WorldPage() {
                 globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg"
                 atmosphereColor="#4ade80"
                 atmosphereAltitude={0.18}
-                pointsData={COUNTRY_COSTS}
+                pointsData={data?.unis?.length ? [...COUNTRY_COSTS, ...(data.unis || []).filter((u) => u.lat && u.lng).map((u) => ({ ...u, isUni: true }))] : COUNTRY_COSTS}
                 pointLat="lat" pointLng="lng"
-                pointColor={(d) => (country === d.name ? "#ffffff" : "#4ade80")}
-                pointAltitude={(d) => (country === d.name ? 0.08 : 0.03)}
-                pointRadius={1.2}
-                pointLabel={(d) => `<b>${d.name}</b><br/>click to explore universities`}
-                onPointClick={(d) => explore(d.name)}
+                pointColor={(d) => (d.isUni ? "#facc15" : country === d.name ? "#ffffff" : "#4ade80")}
+                pointAltitude={(d) => (d.isUni ? 0.09 : country === d.name ? 0.06 : 0.03)}
+                pointRadius={(d) => (d.isUni ? 0.55 : 1.2)}
+                pointLabel={(d) => d.isUni ? `<b>${FIT_EMOJI[d.fit] || ""} ${d.name}</b><br/>${d.city} · accept ${d.acceptRate}` : `<b>${d.name}</b><br/>click to explore universities`}
+                onPointClick={(d) => { if (!d.isUni) explore(d.name); }}
               />
             </Suspense>
             {!country && (
@@ -870,18 +932,19 @@ function ScholarshipsPage() {
         <div className="container">
           <h2 className="section-title" style={{ fontSize: 24 }}>🏆 The famous ones</h2>
           <div style={{ color: "var(--slate)", fontSize: 14, marginBottom: 14 }}>Showing <b>{list.length}</b> of {SCHOLARSHIPS.length}</div>
-          <div className="grid3">
+          <div style={{ display: "grid", gap: 12 }}>
             {list.map((s) => (
-              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="card" style={{ textDecoration: "none", overflow: "hidden", display: "block" }}>
-                <div className="sch-head">
-                  <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>{s.name}</div>
-                  <div style={{ fontSize: 26 }}>{s.emoji}</div>
-                </div>
-                <div style={{ padding: 16 }}>
+              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" className="ticket">
+                <div className="ticket-band">{s.emoji}</div>
+                <div style={{ flex: 1, minWidth: 200, padding: "14px 16px" }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 17 }}>{s.name}</div>
                   <div style={{ color: "var(--slate)", fontSize: 13 }}>{s.country} · {s.level}</div>
-                  <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 14, marginTop: 10 }}>💸 {s.coverage}</div>
-                  <div className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 700, marginTop: 8 }}>⏰ {s.deadline}</div>
-                  <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13.5, marginTop: 12 }}>Official page →</div>
+                  <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 14, marginTop: 6 }}>💸 {s.coverage}</div>
+                </div>
+                <div className="ticket-right">
+                  <div className="mono" style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--slate)" }}>DEADLINE</div>
+                  <div className="mono" style={{ fontSize: 14, color: "var(--accent)", fontWeight: 700 }}>⏰ {s.deadline}</div>
+                  <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13, marginTop: 6 }}>Apply →</div>
                 </div>
               </a>
             ))}
