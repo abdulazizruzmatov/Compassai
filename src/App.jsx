@@ -528,6 +528,7 @@ function HomePage() {
 function AdvisorPage({ tracked, track, session, openAuth }) {
   const saved = loadProfile();
   const [form, setForm] = useState({ goal: saved.goal || "", interests: saved.interests || "", level: saved.level || "Bachelor's", home: saved.home || "", budget: saved.budget || BUDGETS[2], regions: saved.regions || [], ielts: saved.ielts || "", gpa: saved.gpa || "", certs: saved.certs || "" });
+  const [step, setStep] = useState(0);
   const [phase, setPhase] = useState("form");
   const [plan, setPlan] = useState(null);
   const [skills, setSkills] = useState(null);
@@ -575,63 +576,75 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
         <h1 className="section-title">Your AI advisor 🧭</h1>
         <p className="section-sub">Tell it your mind. It answers like an agency would — degrees explained, honest chances against your scores, visa steps, real costs, documents — for free.</p>
 
-        {phase === "form" && (
-          <div className="card" style={{ padding: "30px 30px 34px", boxShadow: "0 2px 16px rgba(11,61,46,0.05)", borderRadius: 18 }}>
-            <div className="display" style={{ fontWeight: 700, fontSize: 21 }}>Tell us about you</div>
-            <p style={{ color: "var(--slate)", fontSize: 14, margin: "4px 0 24px", fontFamily: "Inter, sans-serif" }}>Two minutes. The more honest you are, the better your plan.</p>
+        {phase === "form" && (() => {
+          const STEPS = [
+            { key: "goal", title: "Who do you wanna be?", sub: "Your dream job — dream big, we'll map the route.", type: "text", ph: "a game developer, a surgeon, a startup founder…", req: true },
+            { key: "interests", title: "What do you love?", sub: "The stuff you'd do even if nobody paid you.", type: "area", ph: "football analytics, coding, making videos…", req: true },
+            { key: "home", title: "Where are you from?", sub: "So we get your visa route & funding right.", type: "text", ph: "Uzbekistan", req: true },
+            { key: "level", title: "What level?", sub: "Where you're starting from.", type: "pick", opts: LEVELS },
+            { key: "ielts", title: "English score?", sub: "IELTS/TOEFL — leave blank if you haven't taken it yet.", type: "text", ph: "6.5, or 'not taken yet'" },
+            { key: "gpa", title: "Your grades?", sub: "GPA or A-levels — roughly is fine.", type: "text", ph: "4.2/5, or A-levels AAB" },
+            { key: "certs", title: "Any wins so far?", sub: "Certificates, medals, projects — they strengthen you. 💪", type: "area", ph: "SAT 1350, olympiad medal, coding bootcamp, volunteering…" },
+            { key: "budget", title: "Your budget?", sub: "Per year, all-in. Be honest — we'll find funding.", type: "chips", opts: BUDGETS },
+            { key: "regions", title: "Where in the world?", sub: "Pick any that excite you — or Anywhere. 🌍", type: "multi", opts: REGIONS },
+          ];
+          const cur = STEPS[step];
+          const val = form[cur.key];
+          const filled = cur.type === "multi" ? true : cur.type === "chips" || cur.type === "pick" ? !!val : (cur.req ? String(val || "").trim() : true);
+          const last = step === STEPS.length - 1;
+          const next = () => { if (last) run(); else setStep((s) => Math.min(s + 1, STEPS.length - 1)); };
+          const back = () => setStep((s) => Math.max(s - 1, 0));
+          return (
+            <div className="wizard">
+              <div className="wiz-bar"><div className="wiz-fill" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
+              <div className="wiz-count">Step {step + 1} of {STEPS.length}</div>
 
-            <div style={{ display: "grid", gap: 20 }}>
-              <div>
-                <div className="f-label">I want to become</div>
-                <input className="input f-input" value={form.goal} onChange={(e) => set("goal", e.target.value)} placeholder="a game developer, a surgeon, a startup founder…" />
-              </div>
-              <div>
-                <div className="f-label">My interests</div>
-                <textarea className="input f-input" style={{ minHeight: 72, resize: "vertical" }} value={form.interests} onChange={(e) => set("interests", e.target.value)} placeholder="football analytics, coding, making videos…" />
-              </div>
-              <div className="grid2">
-                <div>
-                  <div className="f-label">Home country</div>
-                  <input className="input f-input" value={form.home} onChange={(e) => set("home", e.target.value)} placeholder="Uzbekistan" />
-                </div>
-                <div>
-                  <div className="f-label">Study level</div>
-                  <select className="input f-input" value={form.level} onChange={(e) => set("level", e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
-                </div>
-              </div>
-              <div className="grid2">
-                <div>
-                  <div className="f-label">IELTS / English <span className="f-hint">optional</span></div>
-                  <input className="input f-input" value={form.ielts} onChange={(e) => set("ielts", e.target.value)} placeholder="6.5, or 'not taken yet'" />
-                </div>
-                <div>
-                  <div className="f-label">GPA / grades <span className="f-hint">optional</span></div>
-                  <input className="input f-input" value={form.gpa} onChange={(e) => set("gpa", e.target.value)} placeholder="4.2/5, or A-levels AAB" />
-                </div>
-              </div>
-              <div>
-                <div className="f-label">Certificates & achievements <span className="f-hint">they strengthen you</span></div>
-                <textarea className="input f-input" style={{ minHeight: 58, resize: "vertical" }} value={form.certs} onChange={(e) => set("certs", e.target.value)} placeholder="SAT 1350, olympiad medal, coding bootcamp, volunteering…" />
-              </div>
+              <div key={step} className="wiz-card">
+                <div className="wiz-title">{cur.title}</div>
+                <div className="wiz-sub">{cur.sub}</div>
 
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
-                <div className="f-label">Budget per year</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {BUDGETS.map((b) => <button key={b} className={`chip ${form.budget === b ? "on" : ""}`} onClick={() => set("budget", b)}>{b}</button>)}
-                </div>
-              </div>
-              <div>
-                <div className="f-label">Where in the world</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {REGIONS.map((r) => <button key={r} className={`chip ${form.regions.includes(r) ? "on" : ""}`} onClick={() => toggleRegion(r)}>{r}</button>)}
+                {cur.type === "text" && (
+                  <input autoFocus className="wiz-input" value={val} placeholder={cur.ph}
+                    onChange={(e) => set(cur.key, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && filled) next(); }} />
+                )}
+                {cur.type === "area" && (
+                  <textarea autoFocus className="wiz-input" style={{ minHeight: 90, resize: "vertical" }} value={val} placeholder={cur.ph}
+                    onChange={(e) => set(cur.key, e.target.value)} />
+                )}
+                {cur.type === "pick" && (
+                  <div className="wiz-opts">
+                    {cur.opts.map((o) => <button key={o} className={`wiz-opt ${val === o ? "on" : ""}`} onClick={() => { set(cur.key, o); setTimeout(next, 180); }}>{o}</button>)}
+                  </div>
+                )}
+                {cur.type === "chips" && (
+                  <div className="wiz-opts">
+                    {cur.opts.map((o) => <button key={o} className={`wiz-opt ${val === o ? "on" : ""}`} onClick={() => { set(cur.key, o); setTimeout(next, 180); }}>{o}</button>)}
+                  </div>
+                )}
+                {cur.type === "multi" && (
+                  <div className="wiz-opts">
+                    {cur.opts.map((o) => <button key={o} className={`wiz-opt ${form.regions.includes(o) ? "on" : ""}`} onClick={() => toggleRegion(o)}>{o}</button>)}
+                  </div>
+                )}
+
+                {error && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: 14, marginTop: 14 }}>{error}</div>}
+
+                <div className="wiz-nav">
+                  {step > 0 && <button className="btn pill-btn pill-ghost" onClick={back}>← Back</button>}
+                  <div style={{ flex: 1 }} />
+                  {(cur.type === "text" || cur.type === "area" || cur.type === "multi") && (
+                    <button className="btn btn-accent pill-btn" onClick={next} disabled={!filled}>
+                      {last ? "Build my plan →" : "Next →"}
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {error && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: 14, fontFamily: "Inter, sans-serif" }}>{error}</div>}
-              <button className="btn btn-accent f-cta" onClick={run} disabled={!ready}>Build my plan →</button>
+              <div className="wiz-hint mono">↵ Enter to continue · your answers stay private</div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {phase === "thinking" && <StudyLoader title="Your consultant is thinking" />}
 
