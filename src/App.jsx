@@ -501,7 +501,7 @@ function HomePage() {
           {[
             ["🧭", "AI Advisor", "Your mind → degrees explained, matched universities, honest chances, visa steps, full costs.", "advisor"],
             ["🌍", "World Explorer", "Pick a country → top 20 unis by acceptance rate, with your personal 😊/😢 chance and what to improve.", "world"],
-            ["🎓", "Scholarships", "The famous ones + a live feed from 100 Telegram scholarship channels.", "scholarships"],
+            ["🎓", "Scholarships", "The famous fully-funded programmes plus fresh, hand-picked opportunities updated daily.", "scholarships"],
           ].map(([e, t, d, p]) => (
             <button key={t} onClick={() => go(p)} className="card" style={{ padding: 22, textAlign: "left", cursor: "pointer" }}>
               <div style={{ fontSize: 30 }}>{e}</div>
@@ -614,8 +614,17 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
           const back = () => setStep((s) => Math.max(s - 1, 0));
           return (
             <div className="wizard">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                <div className="wiz-count" style={{ marginTop: 0 }}>Step {step + 1} of {STEPS.length}</div>
+                {session ? (
+                  <div className="usage-pill unlimited">✓ Unlimited plans</div>
+                ) : (
+                  <div className={`usage-pill ${DAILY_LIMIT - getUsage() <= 1 ? "low" : ""}`}>
+                    🎁 {Math.max(0, DAILY_LIMIT - getUsage())} of {DAILY_LIMIT} free plans left today
+                  </div>
+                )}
+              </div>
               <div className="wiz-bar"><div className="wiz-fill" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} /></div>
-              <div className="wiz-count">Step {step + 1} of {STEPS.length}</div>
 
               <div key={step} className="wiz-card">
                 <div className="wiz-title">{cur.title}</div>
@@ -659,7 +668,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
                 </div>
               </div>
 
-              <div className="wiz-hint mono">{session ? "✓ Unlimited plans — you're signed in" : `↵ Enter to continue · ${Math.max(0, DAILY_LIMIT - getUsage())} free plan${DAILY_LIMIT - getUsage() === 1 ? "" : "s"} left today`}</div>
+              <div className="wiz-hint mono">↵ Press Enter to continue · your answers stay private</div>
             </div>
           );
         })()}
@@ -1016,12 +1025,12 @@ function ScholarshipsPage({ session }) {
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <h2 className="section-title" style={{ fontSize: 24, margin: 0 }}>🔴 Live from Telegram</h2>
-            <span className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, animation: "blink 1.6s infinite" }}>● LIVE</span>
+            <h2 className="section-title" style={{ fontSize: 24, margin: 0 }}>🆕 Latest opportunities</h2>
+            <span className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, animation: "blink 1.6s infinite" }}>● UPDATED DAILY</span>
           </div>
           {feed.length === 0 ? (
             <div className="card" style={{ padding: 18, fontSize: 14, color: "var(--slate)" }}>
-              Feed warming up 🔌 — new scholarships from 100+ Telegram channels will appear here the moment they're posted. Meanwhile, join <a href={LINKS.telegram} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 700 }}>our channel</a>.
+              Fresh scholarships are added regularly — hand-picked and verified so you only see the ones worth your time. Want them in your pocket? <a href={LINKS.telegram} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 700 }}>Follow our channel</a> for instant alerts.
             </div>
           ) : (
             <div className="grid3">
