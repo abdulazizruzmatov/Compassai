@@ -1742,7 +1742,9 @@ export default function App() {
     if (supabase && session) await supabase.from("tracked_applications").delete().eq("id", id);
   };
 
-  const NAV = [["home", "Home"], ["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`], ["community", "💬 Community"], ["plans", "🚀 Plans"], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
+  const NAV_MAIN = [["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`]];
+  const NAV_MORE = [["community", "💬 Community"], ["plans", "🚀 Plans"], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
+  const [moreOpen, setMoreOpen] = useState(false);
 
   return (
     <div>
@@ -1753,8 +1755,19 @@ export default function App() {
           <a href="#/home" className="logo" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.02em", textDecoration: "none" }}>
             🧭 Compass<span style={{ color: "var(--accent)" }}>.</span>
           </a>
-          <nav className="nav-links" style={{ display: "flex", gap: 2 }}>
-            {NAV.map(([id, l]) => <a key={id} href={`#/${id}`} className={`nav-link ${page === id ? "active" : ""}`}>{l}</a>)}
+          <nav className="nav-links" style={{ display: "flex", gap: 2, alignItems: "center" }}>
+            <a href="#/home" className={`nav-link ${page === "home" ? "active" : ""}`}>Home</a>
+            {NAV_MAIN.map(([id, l]) => <a key={id} href={`#/${id}`} className={`nav-link ${page === id ? "active" : ""}`}>{l}</a>)}
+            <div style={{ position: "relative" }} onMouseLeave={() => setMoreOpen(false)}>
+              <button className={`nav-link ${NAV_MORE.some(([id]) => id === page) ? "active" : ""}`} style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }} onClick={() => setMoreOpen(!moreOpen)}>More ⋯</button>
+              {moreOpen && (
+                <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#fff", border: "1px solid var(--line)", borderRadius: 12, boxShadow: "0 12px 30px rgba(11,61,46,0.15)", padding: 6, minWidth: 170, zIndex: 60, display: "grid", gap: 2 }}>
+                  {NAV_MORE.map(([id, l]) => (
+                    <a key={id} href={`#/${id}`} onClick={() => setMoreOpen(false)} className={`nav-link ${page === id ? "active" : ""}`} style={{ display: "block" }}>{l}</a>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {session ? (
@@ -1787,6 +1800,11 @@ export default function App() {
         <div className="container" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, fontSize: 13 }}>
           <div><span className="display" style={{ color: "#fff", fontWeight: 700 }}>🧭 Compass<span style={{ color: "var(--mint)" }}>.</span></span> — every rejection is redirection 🌍</div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <a href="#/advisor" style={{ textDecoration: "none" }}>Advisor</a>
+            <a href="#/world" style={{ textDecoration: "none" }}>World</a>
+            <a href="#/scholarships" style={{ textDecoration: "none" }}>Scholarships</a>
+            <a href="#/community" style={{ textDecoration: "none" }}>Community</a>
+            <a href="#/plans" style={{ textDecoration: "none" }}>Plans</a>
             <a href="#/blog" style={{ textDecoration: "none" }}>Blog</a>
             <a href="#/contact" style={{ textDecoration: "none" }}>Contact</a>
             <a href={LINKS.telegram} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Telegram</a>
