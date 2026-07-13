@@ -73,6 +73,18 @@ function bumpUsage() {
   return n;
 }
 
+const BUDDY_LIMIT = 8;
+function getBuddyUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  try { const u = JSON.parse(localStorage.getItem("compass-buddy") || "{}"); return u.date === today ? u.count : 0; } catch { return 0; }
+}
+function bumpBuddyUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  const n = getBuddyUsage() + 1;
+  localStorage.setItem("compass-buddy", JSON.stringify({ date: today, count: n }));
+  return n;
+}
+
 /* ---------------- AI ---------------- */
 const AI_GUARD = `You are Compass, an expert university-admissions and study-abroad advisor ONLY. You act like a specialist professor of international admissions. You ONLY discuss: universities, degrees, courses, admissions, acceptance chances, scholarships, student visas, application documents, English tests (IELTS/TOEFL), living costs for students, and student work regulations. If asked anything outside study-abroad, politely refuse in one line and steer back. Be accurate, specific and encouraging (failure is a step to success). Never invent fake universities.`;
 
@@ -214,7 +226,7 @@ function CompassHero() {
 }
 
 /* ---------------- Buddy chat (floating) ---------------- */
-function Buddy() {
+function Buddy({ session, openAuth }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([{ role: "buddy", text: "Hey! I'm your Compass Buddy 🧭 Ask me anything — CAS letters, IELTS, visas, deadlines, documents. Short answers, no fluff." }]);
   const [input, setInput] = useState("");
@@ -226,7 +238,13 @@ function Buddy() {
   const send = async () => {
     const q = input.trim();
     if (!q || busy) return;
+    if (!session && getBuddyUsage() >= BUDDY_LIMIT) {
+      setMsgs((p) => [...p, { role: "buddy", text: "You've used your free Buddy messages for today 🧭 Sign in (free) for unlimited chat, or come back tomorrow. Tap the button below 👇", limit: true }]);
+      setInput("");
+      return;
+    }
     setInput("");
+    if (!session) bumpBuddyUsage();
     const history = [...msgs, { role: "you", text: q }];
     setMsgs(history); setBusy(true);
     try {
@@ -249,7 +267,10 @@ Buddy:`;
       {open && (
         <div style={{ position: "fixed", right: 22, bottom: 96, zIndex: 70, width: "min(360px, 92vw)", background: "#fff", border: "1px solid var(--line)", borderRadius: 16, boxShadow: "0 18px 50px rgba(11,61,46,0.3)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "70vh" }}>
           <div style={{ background: "var(--ink)", color: "#fff", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div className="display" style={{ fontWeight: 700 }}>🧭 Compass Buddy</div>
+            <div>
+              <div className="display" style={{ fontWeight: 700 }}>🧭 Compass Buddy</div>
+              <div className="mono" style={{ fontSize: 10.5, color: "#A9C6B7", marginTop: 2 }}>{session ? "Unlimited" : `${Math.max(0, BUDDY_LIMIT - getBuddyUsage())} free messages left today`}</div>
+            </div>
             <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#A9C6B7", cursor: "pointer", fontSize: 16 }}>✕</button>
           </div>
           <div ref={boxRef} style={{ padding: 14, overflowY: "auto", display: "grid", gap: 10, flex: 1 }}>
@@ -259,7 +280,7 @@ Buddy:`;
                 background: m.role === "you" ? "var(--accent)" : "#EFF6F1",
                 color: m.role === "you" ? "#fff" : "var(--ink)",
                 borderRadius: 12, padding: "10px 13px", fontSize: 14, lineHeight: 1.45, maxWidth: "85%", whiteSpace: "pre-wrap",
-              }}>{m.text}</div>
+              }}>{m.text}{m.limit && <div style={{ marginTop: 8 }}><button className="btn btn-accent" style={{ padding: "8px 14px", fontSize: 13 }} onClick={openAuth}>Sign in — go unlimited →</button></div>}</div>
             ))}
             {busy && <div className="mono" style={{ fontSize: 12, color: "var(--slate)", animation: "blink 1.1s infinite" }}>Buddy is thinking…</div>}
           </div>
@@ -1753,7 +1774,7 @@ export default function App() {
       {page === "blog" && <BlogPage session={session} />}
       {page === "contact" && <ContactPage />}
 
-      <Buddy />
+      <Buddy session={session} openAuth={() => setAuthOpen(true)} />
 
       <FounderBar />
 
