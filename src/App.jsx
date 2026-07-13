@@ -1407,10 +1407,15 @@ function CommunityPage({ session, openAuth }) {
           </div>
 
           {list.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--slate)" }}>
+            <div style={{ textAlign: "center", padding: "50px 20px", color: "var(--slate)" }}>
               <div style={{ fontSize: 40 }}>💬</div>
-              <div className="display" style={{ fontWeight: 700, fontSize: 18, color: "var(--ink)", marginTop: 8 }}>No questions yet</div>
-              <div style={{ fontSize: 14, marginTop: 6 }}>Be the first — ask anything about studying abroad.</div>
+              <div className="display" style={{ fontWeight: 700, fontSize: 20, color: "var(--ink)", marginTop: 8 }}>Ask the first question</div>
+              <div style={{ fontSize: 14, marginTop: 6, marginBottom: 20 }}>Not sure where to start? Tap one 👇</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 620, margin: "0 auto" }}>
+                {["Is IELTS 6.5 enough for a UK master's?", "Cheapest countries to study medicine?", "How hard is the Chevening essay?", "How much bank balance for a UK student visa?", "Do I need SAT for European universities?"].map((s) => (
+                  <button key={s} className="chip" onClick={() => { if (!session) { openAuth(); return; } setNq({ title: s, body: "", tag: "General" }); setShowAsk(true); window.scrollTo({ top: 200, behavior: "smooth" }); }}>💡 {s}</button>
+                ))}
+              </div>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
