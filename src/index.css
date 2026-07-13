@@ -207,3 +207,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .wiz-nav { display: flex; align-items: center; gap: 12px; margin-top: 30px; }
 .wiz-hint { text-align: center; font-size: 11.5px; letter-spacing: 0.08em; color: #9db0a6; margin-top: 18px; }
 @media (max-width: 640px) { .wiz-card { padding: 28px 22px; } .wiz-title { font-size: 27px; } .wiz-input { font-size: 20px; } }
+
+/* ---- plan cards ---- */
+.plan-card { overflow: visible; }
+.plan-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font-family: "Inter", sans-serif; font-weight: 700; font-size: 12.5px; padding: 5px 16px; border-radius: 999px; white-space: nowrap; box-shadow: 0 6px 16px rgba(22,163,74,0.35); }
+
+/* ---- visible usage badge ---- */
+.usage-pill { display: inline-flex; align-items: center; gap: 6px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 13px; padding: 7px 14px; border-radius: 999px; border: 1.5px solid var(--accent); color: var(--accent); background: #ecfdf3; white-space: nowrap; }
+.usage-pill.low { border-color: var(--amber); color: var(--amber); background: #fff7e6; animation: pulse-pill 1.6s ease-in-out infinite; }
+.usage-pill.unlimited { border-color: var(--green); color: var(--green); background: #eaf5ef; }
+@keyframes pulse-pill { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
