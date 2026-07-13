@@ -13,6 +13,7 @@ const LINKS = {
   email: "hello@compassabroad.com",
 };
 const FORMSPREE_ID = "xvzvqbae";
+const ADMIN_EMAIL = "ruzmetovblog@gmail.com"; // only THIS signed-in email sees the "+ Add scholarship" box
 const SPONSOR = {
   name: "New Uzbekistan University",
   city: "Tashkent, Uzbekistan 🇺🇿",
@@ -56,6 +57,21 @@ const go = (p) => (window.location.hash = `/${p}`);
 /* ---------------- shared profile (used by Advisor, World, Buddy) ---------------- */
 const loadProfile = () => { try { return JSON.parse(sessionStorage.getItem("compass-profile") || "{}"); } catch { return {}; } };
 const saveProfile = (p) => sessionStorage.setItem("compass-profile", JSON.stringify(p));
+
+const DAILY_LIMIT = 3;
+function getUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const u = JSON.parse(localStorage.getItem("compass-usage") || "{}");
+    return u.date === today ? u.count : 0;
+  } catch { return 0; }
+}
+function bumpUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  const n = getUsage() + 1;
+  localStorage.setItem("compass-usage", JSON.stringify({ date: today, count: n }));
+  return n;
+}
 
 /* ---------------- AI ---------------- */
 const AI_GUARD = `You are Compass, an expert university-admissions and study-abroad advisor ONLY. You act like a specialist professor of international admissions. You ONLY discuss: universities, degrees, courses, admissions, acceptance chances, scholarships, student visas, application documents, English tests (IELTS/TOEFL), living costs for students, and student work regulations. If asked anything outside study-abroad, politely refuse in one line and steer back. Be accurate, specific and encouraging (failure is a step to success). Never invent fake universities.`;
@@ -544,7 +560,9 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
   const ready = form.goal.trim() && form.interests.trim() && form.home.trim();
 
   const run = async () => {
+    if (!session && getUsage() >= DAILY_LIMIT) { setPhase("limit"); return; }
     setError(""); setPhase("thinking"); saveProfile(form);
+    if (!session) bumpUsage();
     try {
       const c = parseJSON(await askAI(consultPrompt(form)));
       setConsult(c); setAnswers((c.questions || []).map(() => "")); setPhase("consult");
@@ -641,10 +659,23 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
                 </div>
               </div>
 
-              <div className="wiz-hint mono">↵ Enter to continue · your answers stay private</div>
+              <div className="wiz-hint mono">{session ? "✓ Unlimited plans — you're signed in" : `↵ Enter to continue · ${Math.max(0, DAILY_LIMIT - getUsage())} free plan${DAILY_LIMIT - getUsage() === 1 ? "" : "s"} left today`}</div>
             </div>
           );
         })()}
+
+        {phase === "limit" && (
+          <div className="card" style={{ padding: "44px 34px", textAlign: "center", maxWidth: 560, margin: "0 auto", borderTop: "4px solid var(--accent)", animation: "rise .4s both" }}>
+            <div style={{ fontSize: 46 }}>🧭</div>
+            <div className="display" style={{ fontWeight: 700, fontSize: 26, marginTop: 8 }}>You've used your 3 free plans today</div>
+            <p style={{ color: "var(--slate)", fontSize: 15.5, lineHeight: 1.6, margin: "12px auto 22px", maxWidth: 420, fontFamily: "Inter, sans-serif" }}>
+              Sign in (free, 10 seconds) for <b>unlimited</b> plans, plus your tracker syncs across devices and you unlock every visa & document guide. ✌️
+            </p>
+            <button className="btn btn-accent pill-btn" onClick={openAuth}>Sign in — go unlimited →</button>
+            <div style={{ marginTop: 14 }}><a href="#/plans" style={{ color: "var(--accent)", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>See Pro & Max plans →</a></div>
+            <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginTop: 10 }}>or come back tomorrow for 3 more</div>
+          </div>
+        )}
 
         {phase === "thinking" && <StudyLoader title="Your consultant is thinking" />}
 
@@ -896,7 +927,7 @@ function WorldPage() {
   );
 }
 
-function ScholarshipsPage() {
+function ScholarshipsPage({ session }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
   const [feed, setFeed] = useState([]);
@@ -916,6 +947,24 @@ function ScholarshipsPage() {
       setFeed(data || []);
     })();
   }, []);
+
+  const isAdmin = session && ADMIN_EMAIL && session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [np, setNp] = useState({ title: "", url: "", coverage: "" });
+  const [saving, setSaving] = useState(false);
+  const addScholarship = async () => {
+    if (!supabase || !np.title.trim()) return;
+    setSaving(true);
+    const { data, error } = await supabase.from("scholarship_feed")
+      .insert({ title: np.title, url: np.url, coverage: np.coverage, source: "jamg1etng" })
+      .select().single();
+    if (!error && data) { setFeed((f) => [data, ...f]); setNp({ title: "", url: "", coverage: "" }); }
+    setSaving(false);
+  };
+  const delScholarship = async (id) => {
+    if (!supabase) return;
+    setFeed((f) => f.filter((x) => x.id !== id));
+    await supabase.from("scholarship_feed").delete().eq("id", id);
+  };
   const list = SCHOLARSHIPS.filter((s) => {
     if (filter === "Full ride" && !fullRide(s)) return false;
     if (["UK 🇬🇧", "Europe 🇪🇺", "Asia 🌏", "Americas 🌎"].includes(filter) && region(s) !== filter) return false;
@@ -951,6 +1000,21 @@ function ScholarshipsPage() {
       {/* live feed */}
       <section className="section" style={{ paddingBottom: 0 }}>
         <div className="container">
+          {isAdmin && (
+            <div className="card" style={{ padding: 20, marginBottom: 22, borderTop: "4px solid var(--accent)" }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>➕ Add a scholarship (admin)</div>
+              <p style={{ color: "var(--slate)", fontSize: 13, margin: "4px 0 14px" }}>Only you see this. It appears live for everyone instantly.</p>
+              <div style={{ display: "grid", gap: 10 }}>
+                <input className="input" placeholder="Title — e.g. Chevening 2027 now open" value={np.title} onChange={(e) => setNp({ ...np, title: e.target.value })} />
+                <div className="grid2">
+                  <input className="input" placeholder="Link (t.me/... or official)" value={np.url} onChange={(e) => setNp({ ...np, url: e.target.value })} />
+                  <input className="input" placeholder="Coverage — e.g. Full ride" value={np.coverage} onChange={(e) => setNp({ ...np, coverage: e.target.value })} />
+                </div>
+                <button className="btn btn-accent" style={{ justifySelf: "start", padding: "11px 20px" }} onClick={addScholarship} disabled={saving || !np.title.trim()}>{saving ? "Posting…" : "Post it live →"}</button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <h2 className="section-title" style={{ fontSize: 24, margin: 0 }}>🔴 Live from Telegram</h2>
             <span className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, animation: "blink 1.6s infinite" }}>● LIVE</span>
@@ -962,11 +1026,14 @@ function ScholarshipsPage() {
           ) : (
             <div className="grid3">
               {feed.map((f) => (
-                <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className="card" style={{ padding: 16, textDecoration: "none", display: "block" }}>
-                  <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>@{f.source} · {new Date(f.posted_at).toLocaleDateString()}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14.5, margin: "6px 0", lineHeight: 1.4 }}>{f.title}</div>
-                  {f.coverage && <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 13 }}>💸 {f.coverage}</div>}
-                </a>
+                <div key={f.id} className="card" style={{ padding: 16, position: "relative" }}>
+                  {isAdmin && <button onClick={() => delScholarship(f.id)} style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>}
+                  <a href={f.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none", display: "block" }}>
+                    <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>@{f.source} · {new Date(f.posted_at).toLocaleDateString()}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14.5, margin: "6px 0", lineHeight: 1.4 }}>{f.title}</div>
+                    {f.coverage && <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 13 }}>💸 {f.coverage}</div>}
+                  </a>
+                </div>
               ))}
             </div>
           )}
@@ -1008,18 +1075,97 @@ function ScholarshipsPage() {
   );
 }
 
-function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
+
+const PREP_STEPS = [
+  { key: "passport", label: "Valid passport (6+ months)", group: "Documents" },
+  { key: "transcript", label: "Academic transcripts (translated/certified)", group: "Documents" },
+  { key: "diploma", label: "Diploma / graduation certificate", group: "Documents" },
+  { key: "ielts", label: "English test (IELTS/TOEFL) booked or done", group: "Documents" },
+  { key: "sop", label: "Personal statement / SOP written", group: "Application" },
+  { key: "refs", label: "Recommendation letters (2)", group: "Application" },
+  { key: "cv", label: "CV / resume updated", group: "Application" },
+  { key: "portfolio", label: "Portfolio (if required)", group: "Application" },
+  { key: "submitted", label: "Application submitted on portal", group: "Application" },
+  { key: "offer", label: "Offer / admission letter received", group: "Visa" },
+  { key: "funds", label: "Proof of funds / bank statement ready", group: "Visa" },
+  { key: "cas", label: "CAS / I-20 / acceptance for visa received", group: "Visa" },
+  { key: "visaform", label: "Visa application form filled", group: "Visa" },
+  { key: "visafee", label: "Visa fee + health surcharge paid", group: "Visa" },
+  { key: "biometrics", label: "Biometrics / interview appointment booked", group: "Visa" },
+  { key: "insurance", label: "Health insurance arranged", group: "Arrival" },
+  { key: "housing", label: "Accommodation booked", group: "Arrival" },
+  { key: "flight", label: "Flights booked", group: "Arrival" },
+];
+
+function PrepChecklist({ item, onToggle }) {
+  const done = item.prep || {};
+  const groups = ["Documents", "Application", "Visa", "Arrival"];
+  const total = PREP_STEPS.length;
+  const doneCount = PREP_STEPS.filter((s) => done[s.key]).length;
+  const pct = Math.round((doneCount / total) * 100);
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div className="label" style={{ margin: 0 }}>📋 Application & visa prep</div>
+        <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? "var(--green)" : "var(--accent)" }}>{doneCount}/{total} · {pct}%</div>
+      </div>
+      <div className="wiz-bar" style={{ marginBottom: 12 }}><div className="wiz-fill" style={{ width: `${pct}%` }} /></div>
+      <div className="grid2">
+        {groups.map((g) => (
+          <div key={g} style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 8, fontFamily: "Inter, sans-serif" }}>{ { Documents: "📄 Documents", Application: "✍️ Application", Visa: "🛂 Visa", Arrival: "✈️ Arrival" }[g] }</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {PREP_STEPS.filter((s) => s.group === g).map((s) => (
+                <label key={s.key} style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13.5, cursor: "pointer", lineHeight: 1.4 }}>
+                  <input type="checkbox" checked={!!done[s.key]} onChange={() => onToggle(s.key)} style={{ marginTop: 2, accentColor: "var(--accent)", width: 16, height: 16, flexShrink: 0 }} />
+                  <span style={{ color: done[s.key] ? "var(--slate)" : "var(--ink)", textDecoration: done[s.key] ? "line-through" : "none" }}>{s.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrackerPage({ tracked, updateTrack, removeTrack, session, openAuth }) {
   const counts = {
     total: tracked.length,
     progress: tracked.filter((t) => t.status === "In progress").length,
     applied: tracked.filter((t) => t.status === "Applied").length,
     offers: tracked.filter((t) => t.status === "Offer").length,
   };
+  const [openId, setOpenId] = useState(null);
+
+  const togglePrep = (t, key) => {
+    const prep = { ...(t.prep || {}), [key]: !(t.prep && t.prep[key]) };
+    updateTrack({ ...t, prep });
+  };
+
   return (
     <section className="section">
       <div className="container">
-        <h1 className="section-title">My applications 📋</h1>
-        <p className="section-sub">{session ? "Synced to your account ✅" : "Saved on this device — sign in with Google or email to sync across devices 🔄"}</p>
+        {session && (
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accent)", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", fontSize: 20 }}>{(session.user.email || "?")[0].toUpperCase()}</div>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 22 }}>My Compass</div>
+              <div style={{ color: "var(--slate)", fontSize: 13.5 }}>{session.user.email} · ✓ Unlimited plans</div>
+            </div>
+          </div>
+        )}
+
+        <h1 className="section-title" style={{ fontSize: 26 }}>My applications 📋</h1>
+        <p className="section-sub">{session ? "Track every university, tick off documents, visa steps and arrival prep — all synced." : "Saved on this device — sign in to sync + unlock the full prep checklist 🔄"}</p>
+
+        {!session && (
+          <div className="card" style={{ padding: 18, marginBottom: 18, background: "#E6F0E9", border: "none", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 14 }}>🔒 Sign in to unlock the <b>application & visa prep checklist</b> for each university.</div>
+            <button className="btn btn-accent" style={{ padding: "10px 16px" }} onClick={openAuth}>Sign in →</button>
+          </div>
+        )}
+
         <div className="grid4" style={{ marginBottom: 18 }}>
           {[["Tracked", counts.total, "var(--ink)"], ["In progress", counts.progress, "var(--amber)"], ["Applied", counts.applied, "var(--blue)"], ["Offers 🎉", counts.offers, "var(--green)"]].map(([l, n, c]) => (
             <div key={l} className="card" style={{ padding: "14px 16px", textAlign: "center" }}>
@@ -1028,6 +1174,7 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
             </div>
           ))}
         </div>
+
         {tracked.length === 0 ? (
           <div style={{ border: "1.5px dashed var(--line)", borderRadius: 14, padding: "50px 24px", textAlign: "center", background: "var(--card)" }}>
             <div className="display" style={{ fontWeight: 700, fontSize: 18 }}>Nothing tracked yet 👀</div>
@@ -1039,6 +1186,7 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
             {[...tracked].sort((a, b) => ((a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1)).map((t) => {
               const u = t.uni || t;
               const c = STATUS_COLOR[t.status] || "var(--slate)";
+              const isOpen = openId === t.id;
               return (
                 <div key={t.id} className="card" style={{ borderLeft: `4px solid ${c}`, padding: "14px 16px" }}>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
@@ -1057,6 +1205,17 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
                   </div>
                   {t.deadline && <div className="mono" style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700, marginTop: 8 }}>⏰ DEADLINE {t.deadline}</div>}
                   <textarea className="input" style={{ marginTop: 10, minHeight: 44, resize: "vertical", fontSize: 13.5 }} placeholder="My notes… e.g. IELTS booked, need 2 references 📝" value={t.notes || ""} onChange={(e) => updateTrack({ ...t, notes: e.target.value })} />
+
+                  {session ? (
+                    <>
+                      <button onClick={() => setOpenId(isOpen ? null : t.id)} style={{ marginTop: 12, background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 14, padding: 0 }}>
+                        {isOpen ? "▲ Hide prep checklist" : "▼ Open application & visa prep checklist"}
+                      </button>
+                      {isOpen && <PrepChecklist item={t} onToggle={(k) => togglePrep(t, k)} />}
+                    </>
+                  ) : (
+                    <button onClick={openAuth} className="unlock-btn">🔒 Sign in to unlock this university's application & visa checklist</button>
+                  )}
                 </div>
               );
             })}
@@ -1067,7 +1226,283 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session }) {
   );
 }
 
-function BlogPage() {
+function PlansPage({ session, openAuth }) {
+  const TIERS = [
+    {
+      name: "Free", tag: "Start here", accent: "var(--slate)", featured: false,
+      line: "Taste the compass.",
+      feats: ["3 AI advisor plans / day", "World Explorer with your chances", "Scholarship directory + live feed", "Track up to 5 universities", "Community Buddy chat"],
+      cta: session ? "Your current plan" : "Sign in free", disabled: !!session,
+    },
+    {
+      name: "Pro", tag: "Most popular", accent: "var(--accent)", featured: true,
+      line: "For students actively applying.",
+      feats: ["Unlimited AI advisor plans", "Deeper personalised analysis", "Full application & visa prep checklists", "Unlimited university tracking", "Document & deadline reminders", "Priority Buddy responses"],
+      cta: "Coming soon", disabled: true,
+    },
+    {
+      name: "Max", tag: "Serious about a top uni", accent: "var(--ink)", featured: false,
+      line: "The full career-to-university engine.",
+      feats: ["Everything in Pro", "Complete career-to-university roadmap", "Essay & personal-statement guidance", "Scholarship-match shortlisting", "Mock interview & CAS/visa walkthrough", "Early access to IELTS · SAT · GRE tools"],
+      cta: "Coming soon", disabled: true,
+    },
+  ];
+  return (
+    <>
+      <section className="hero-dark" style={{ padding: "52px 0 40px", textAlign: "center" }}>
+        <div className="container">
+          <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--mint)", fontWeight: 700 }}>PLANS</div>
+          <h1 className="section-title" style={{ color: "#fff", fontSize: 40, marginTop: 8 }}>Grow at your pace 🚀</h1>
+          <p style={{ color: "#C9DED2", maxWidth: 560, margin: "0 auto" }}>Start free forever. Upgrade when you're ready to apply. Compass stays transparent — plans unlock more guidance, never biased recommendations.</p>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container grid3" style={{ alignItems: "stretch" }}>
+          {TIERS.map((t) => (
+            <div key={t.name} className="card plan-card" style={{ borderTop: `5px solid ${t.accent}`, position: "relative", transform: t.featured ? "scale(1.03)" : "none", boxShadow: t.featured ? "0 16px 44px rgba(22,163,74,0.2)" : "0 2px 10px rgba(11,61,46,0.06)" }}>
+              {t.featured && <div className="plan-badge">★ {t.tag}</div>}
+              <div style={{ padding: "26px 24px 24px", display: "flex", flexDirection: "column", height: "100%" }}>
+                {!t.featured && <div className="mono" style={{ fontSize: 11, letterSpacing: "0.12em", color: "var(--slate)" }}>{t.tag.toUpperCase()}</div>}
+                <div className="display" style={{ fontWeight: 700, fontSize: 30, marginTop: t.featured ? 8 : 4, color: t.accent === "var(--slate)" ? "var(--ink)" : t.accent }}>{t.name}</div>
+                <div style={{ color: "var(--slate)", fontSize: 14.5, margin: "4px 0 18px", fontFamily: "Inter, sans-serif" }}>{t.line}</div>
+                <div style={{ display: "grid", gap: 10, flex: 1 }}>
+                  {t.feats.map((f, i) => (
+                    <div key={i} style={{ display: "flex", gap: 9, fontSize: 14, lineHeight: 1.45, fontFamily: "Inter, sans-serif" }}>
+                      <span style={{ color: t.accent === "var(--slate)" ? "var(--accent)" : t.accent, fontWeight: 800 }}>✓</span>
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 22 }}>
+                  <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginBottom: 10 }}>💸 Pricing announced soon</div>
+                  <button
+                    className={`btn ${t.featured ? "btn-accent" : "btn-ghost"}`}
+                    style={{ width: "100%", opacity: t.disabled ? 0.6 : 1, cursor: t.disabled ? "default" : "pointer" }}
+                    onClick={() => { if (t.name === "Free" && !session) openAuth(); }}
+                    disabled={t.disabled}
+                  >{t.cta}</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="container" style={{ textAlign: "center", marginTop: 20 }}>
+          <p style={{ color: "var(--slate)", fontSize: 13, maxWidth: 620, margin: "0 auto" }}>Universities can apply for clearly-labelled sponsored visibility — it never influences your AI recommendations. <a href="#/contact" style={{ color: "var(--accent)", fontWeight: 700 }}>Partner with us →</a></p>
+        </div>
+      </section>
+    </>
+  );
+}
+
+
+const Q_TAGS = ["General", "Visa", "Scholarships", "Applications", "IELTS/Tests", "Living Costs", "Country-specific"];
+
+function CommunityPage({ session, openAuth }) {
+  const [qs, setQs] = useState([]);
+  const [tag, setTag] = useState("All");
+  const [sort, setSort] = useState("new");
+  const [openId, setOpenId] = useState(null);
+  const [nq, setNq] = useState({ title: "", body: "", tag: "General" });
+  const [posting, setPosting] = useState(false);
+  const [showAsk, setShowAsk] = useState(false);
+
+  const load = async () => {
+    if (!supabase) return;
+    let q = supabase.from("questions").select("*");
+    q = sort === "top" ? q.order("upvotes", { ascending: false }) : q.order("created_at", { ascending: false });
+    const { data } = await q.limit(50);
+    setQs(data || []);
+  };
+  useEffect(() => { load(); }, [sort]);
+
+  const ask = async () => {
+    if (!session) { openAuth(); return; }
+    if (!nq.title.trim()) return;
+    setPosting(true);
+    const author = (session.user.email || "student").split("@")[0];
+    const { data, error } = await supabase.from("questions")
+      .insert({ user_id: session.user.id, author, title: nq.title, body: nq.body, tag: nq.tag })
+      .select().single();
+    if (!error && data) {
+      setQs((p) => [data, ...p]); setNq({ title: "", body: "", tag: "General" }); setShowAsk(false); setOpenId(data.id);
+      // AI auto-answer
+      try {
+        const txt = await askAI(`A student asked in a study-abroad community. Title: "${data.title}". Details: "${data.body || "none"}". Answer helpfully in under 130 words, practical and encouraging, study-abroad only.`);
+        await supabase.from("answers").insert({ question_id: data.id, author: "Compass AI", body: txt.trim(), is_ai: true });
+      } catch (e) { console.error(e); }
+    }
+    setPosting(false);
+  };
+
+  const upQ = async (q) => {
+    setQs((p) => p.map((x) => (x.id === q.id ? { ...x, upvotes: (x.upvotes || 0) + 1 } : x)));
+    await supabase.from("questions").update({ upvotes: (q.upvotes || 0) + 1 }).eq("id", q.id);
+  };
+
+  const list = qs.filter((q) => tag === "All" || q.tag === tag);
+
+  return (
+    <>
+      <section className="hero-dark" style={{ padding: "48px 0 36px" }}>
+        <div className="container">
+          <h1 className="section-title" style={{ color: "#fff" }}>Community 💬</h1>
+          <p className="section-sub" style={{ color: "#A9C6B7" }}>Ask anything about studying abroad — visas, essays, scholarships, life. Real students answer, and Compass AI replies instantly so you're never left waiting.</p>
+          <button className="btn btn-accent pill-btn" onClick={() => (session ? setShowAsk(!showAsk) : openAuth())}>{session ? "✏️ Ask a question" : "Sign in to ask →"}</button>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          {showAsk && session && (
+            <div className="card" style={{ padding: 20, marginBottom: 20, borderTop: "4px solid var(--accent)" }}>
+              <div className="display" style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Ask the community</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <input className="input" placeholder="Your question — e.g. Is IELTS 6.5 enough for UK master's?" value={nq.title} onChange={(e) => setNq({ ...nq, title: e.target.value })} />
+                <textarea className="input" style={{ minHeight: 70, resize: "vertical" }} placeholder="Add details (optional)…" value={nq.body} onChange={(e) => setNq({ ...nq, body: e.target.value })} />
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <select className="input" style={{ width: "auto", padding: "9px 12px" }} value={nq.tag} onChange={(e) => setNq({ ...nq, tag: e.target.value })}>{Q_TAGS.map((t) => <option key={t}>{t}</option>)}</select>
+                  <button className="btn btn-accent" style={{ padding: "11px 20px" }} onClick={ask} disabled={posting || !nq.title.trim()}>{posting ? "Posting… (AI is answering)" : "Post question →"}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {["All", ...Q_TAGS].map((t) => <button key={t} className={`chip ${tag === t ? "on" : ""}`} onClick={() => setTag(t)}>{t}</button>)}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+            <button className={`chip ${sort === "new" ? "on" : ""}`} onClick={() => setSort("new")}>🕓 Newest</button>
+            <button className={`chip ${sort === "top" ? "on" : ""}`} onClick={() => setSort("top")}>🔥 Top</button>
+          </div>
+
+          {list.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--slate)" }}>
+              <div style={{ fontSize: 40 }}>💬</div>
+              <div className="display" style={{ fontWeight: 700, fontSize: 18, color: "var(--ink)", marginTop: 8 }}>No questions yet</div>
+              <div style={{ fontSize: 14, marginTop: 6 }}>Be the first — ask anything about studying abroad.</div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {list.map((q) => (
+                <div key={q.id} className="card" style={{ padding: "16px 18px" }}>
+                  <div style={{ display: "flex", gap: 14 }}>
+                    <button onClick={() => upQ(q)} style={{ background: "none", border: "1.5px solid var(--line)", borderRadius: 10, padding: "6px 10px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, height: "fit-content" }}>
+                      <span style={{ fontSize: 13 }}>▲</span>
+                      <span className="mono" style={{ fontWeight: 700, fontSize: 14 }}>{q.upvotes || 0}</span>
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span className="tag-green">{q.tag}</span>
+                        <span className="mono" style={{ fontSize: 11.5, color: "var(--slate)" }}>@{q.author || "student"} · {new Date(q.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="display" style={{ fontWeight: 700, fontSize: 17, margin: "8px 0 4px", cursor: "pointer" }} onClick={() => setOpenId(openId === q.id ? null : q.id)}>{q.title}</div>
+                      {q.body && <div style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>{q.body}</div>}
+                      <button onClick={() => setOpenId(openId === q.id ? null : q.id)} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 13.5, padding: "8px 0 0" }}>{openId === q.id ? "▲ Hide answers" : "💬 View & answer"}</button>
+                      {openId === q.id && <AnswerThread q={q} session={session} openAuth={openAuth} />}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function AnswerThread({ q, session, openAuth }) {
+  const [ans, setAns] = useState([]);
+  const [txt, setTxt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    const { data } = await supabase.from("answers").select("*").eq("question_id", q.id).order("is_ai", { ascending: false }).order("upvotes", { ascending: false });
+    setAns(data || []);
+  };
+  useEffect(() => { load(); }, [q.id]);
+  const post = async () => {
+    if (!session) { openAuth(); return; }
+    if (!txt.trim()) return;
+    setBusy(true);
+    const author = (session.user.email || "student").split("@")[0];
+    const { data, error } = await supabase.from("answers").insert({ question_id: q.id, user_id: session.user.id, author, body: txt }).select().single();
+    if (!error && data) { setAns((p) => [...p, data]); setTxt(""); }
+    setBusy(false);
+  };
+  const up = async (a) => {
+    setAns((p) => p.map((x) => (x.id === a.id ? { ...x, upvotes: (x.upvotes || 0) + 1 } : x)));
+    await supabase.from("answers").update({ upvotes: (a.upvotes || 0) + 1 }).eq("id", a.id);
+  };
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14, display: "grid", gap: 10 }}>
+      {ans.map((a) => (
+        <div key={a.id} style={{ display: "flex", gap: 12, padding: a.is_ai ? "12px 14px" : "0", background: a.is_ai ? "#EFF6F1" : "transparent", borderRadius: 10 }}>
+          <button onClick={() => up(a)} style={{ background: "none", border: "1.5px solid var(--line)", borderRadius: 8, padding: "4px 8px", cursor: "pointer", flexShrink: 0, height: "fit-content" }}>
+            <span className="mono" style={{ fontWeight: 700, fontSize: 12 }}>▲ {a.upvotes || 0}</span>
+          </button>
+          <div>
+            <div className="mono" style={{ fontSize: 11.5, color: a.is_ai ? "var(--accent)" : "var(--slate)", fontWeight: 700 }}>{a.is_ai ? "🧭 Compass AI" : "@" + (a.author || "student")}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.5, marginTop: 3, whiteSpace: "pre-wrap" }}>{a.body}</div>
+          </div>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8 }}>
+        <input className="input" placeholder={session ? "Write an answer…" : "Sign in to answer"} value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && post()} />
+        <button className="btn btn-accent" style={{ padding: "10px 16px" }} onClick={post} disabled={busy}>Answer</button>
+      </div>
+    </div>
+  );
+}
+
+function BlogPage({ session }) {
+  const isAdmin = session && ADMIN_EMAIL && session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [posts, setPosts] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [np, setNp] = useState({ title: "", body: "", tag: "Guide", image: "" });
+  const [busy, setBusy] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
+  const load = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(50);
+    setPosts(data || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const aiDraft = async () => {
+    if (!np.title.trim()) return;
+    setBusy(true);
+    try {
+      const txt = await askAI(`Write a helpful study-abroad blog post for students titled "${np.title}". 300-450 words, clear, practical, friendly, with short paragraphs. Study-abroad topics only.`);
+      setNp((p) => ({ ...p, body: txt.trim() }));
+    } catch (e) { console.error(e); }
+    setBusy(false);
+  };
+  const publish = async () => {
+    if (!np.title.trim() || !np.body.trim()) return;
+    setBusy(true);
+    const { data, error } = await supabase.from("posts").insert({ title: np.title, body: np.body, tag: np.tag, image: np.image || null }).select().single();
+    if (!error && data) { setPosts((p) => [data, ...p]); setNp({ title: "", body: "", tag: "Guide", image: "" }); setShowNew(false); }
+    setBusy(false);
+  };
+  const del = async (id) => { setPosts((p) => p.filter((x) => x.id !== id)); await supabase.from("posts").delete().eq("id", id); };
+
+  if (open) {
+    return (
+      <section className="section">
+        <div className="container" style={{ maxWidth: 720 }}>
+          <button onClick={() => setOpen(null)} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", fontSize: 14, padding: 0, marginBottom: 16 }}>← All posts</button>
+          {open.image && <img src={open.image} alt="" style={{ width: "100%", borderRadius: 14, marginBottom: 18 }} />}
+          <span className="tag-green">{open.tag}</span>
+          <h1 className="section-title" style={{ marginTop: 12 }}>{open.title}</h1>
+          <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginBottom: 20 }}>{open.author} · {new Date(open.created_at).toLocaleDateString()}</div>
+          <div style={{ fontSize: 16, lineHeight: 1.75, whiteSpace: "pre-wrap", fontFamily: "Inter, sans-serif" }}>{open.body}</div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="section">
       <div className="container blog-layout">
@@ -1088,24 +1523,49 @@ function BlogPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <div>
               <h1 className="section-title">Blog & Guides 📚</h1>
-              <p className="section-sub" style={{ margin: 0 }}>Admissions tips, scholarship breakdowns and stories where failure became the first step to success.</p>
+              <p className="section-sub" style={{ margin: 0 }}>Admissions tips, scholarship breakdowns and student stories.</p>
             </div>
-            <a className="btn btn-accent" href={`mailto:${LINKS.email}?subject=Blog post for Compass`}>Write a post</a>
+            {isAdmin && <button className="btn btn-accent" onClick={() => setShowNew(!showNew)}>✏️ New post</button>}
           </div>
-          {BLOG_POSTS.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "90px 0", color: "var(--slate)" }}>
+
+          {isAdmin && showNew && (
+            <div className="card" style={{ padding: 20, margin: "18px 0", borderTop: "4px solid var(--accent)" }}>
+              <div style={{ display: "grid", gap: 10 }}>
+                <input className="input" placeholder="Post title" value={np.title} onChange={(e) => setNp({ ...np, title: e.target.value })} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <select className="input" style={{ width: "auto" }} value={np.tag} onChange={(e) => setNp({ ...np, tag: e.target.value })}>{["Guide", "Scholarships", "Visa", "IELTS/Tests", "Story", "News"].map((t) => <option key={t}>{t}</option>)}</select>
+                  <input className="input" placeholder="Image URL (optional)" value={np.image} onChange={(e) => setNp({ ...np, image: e.target.value })} />
+                </div>
+                <textarea className="input" style={{ minHeight: 160, resize: "vertical" }} placeholder="Write the post… or let AI draft it from the title" value={np.body} onChange={(e) => setNp({ ...np, body: e.target.value })} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-ghost" onClick={aiDraft} disabled={busy || !np.title.trim()}>{busy ? "Drafting…" : "🧭 AI draft from title"}</button>
+                  <button className="btn btn-accent" onClick={publish} disabled={busy || !np.title.trim() || !np.body.trim()}>Publish →</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {posts.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "80px 0", color: "var(--slate)" }}>
               <div style={{ fontSize: 40 }}>📝</div>
-              <div className="display" style={{ fontWeight: 700, fontSize: 20, color: "var(--ink)", marginTop: 8 }}>No blog posts yet.</div>
-              <div style={{ fontSize: 14, marginTop: 6 }}>Be the first to share a guide or your admission story.</div>
+              <div className="display" style={{ fontWeight: 700, fontSize: 20, color: "var(--ink)", marginTop: 8 }}>No posts yet.</div>
+              <div style={{ fontSize: 14, marginTop: 6 }}>Guides and stories are coming soon.</div>
             </div>
           ) : (
-            <div style={{ display: "grid", gap: 14, marginTop: 22 }}>
-              {BLOG_POSTS.map((p) => (
-                <a key={p.title} href={p.url} className="card" style={{ padding: 20, textDecoration: "none", display: "block" }}>
-                  <div className="mono" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>{p.tag} · {p.date}</div>
-                  <div className="display" style={{ fontWeight: 700, fontSize: 19, margin: "6px 0" }}>{p.title}</div>
-                  <div style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>{p.text}</div>
-                </a>
+            <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
+              {posts.map((p) => (
+                <div key={p.id} className="card" style={{ overflow: "hidden", position: "relative" }}>
+                  {isAdmin && <button onClick={() => del(p.id)} style={{ position: "absolute", top: 10, right: 12, background: "rgba(255,255,255,0.9)", border: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700, borderRadius: 6, padding: "2px 8px", zIndex: 2 }}>×</button>}
+                  <div onClick={() => setOpen(p)} style={{ cursor: "pointer" }}>
+                    {p.image && <img src={p.image} alt="" style={{ width: "100%", height: 180, objectFit: "cover" }} />}
+                    <div style={{ padding: 20 }}>
+                      <span className="tag-green">{p.tag}</span>
+                      <div className="display" style={{ fontWeight: 700, fontSize: 20, margin: "10px 0 6px" }}>{p.title}</div>
+                      <div style={{ color: "var(--slate)", fontSize: 14, lineHeight: 1.5 }}>{(p.body || "").slice(0, 140)}…</div>
+                      <div className="mono" style={{ fontSize: 11.5, color: "var(--slate)", marginTop: 10 }}>{p.author} · {new Date(p.created_at).toLocaleDateString()} · Read →</div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -1247,7 +1707,7 @@ export default function App() {
     if (supabase && session) await supabase.from("tracked_applications").delete().eq("id", id);
   };
 
-  const NAV = [["home", "Home"], ["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
+  const NAV = [["home", "Home"], ["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`], ["community", "💬 Community"], ["plans", "🚀 Plans"], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
 
   return (
     <div>
@@ -1277,9 +1737,11 @@ export default function App() {
       {page === "home" && <HomePage />}
       {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} openAuth={() => setAuthOpen(true)} />}
       {page === "world" && <WorldPage />}
-      {page === "scholarships" && <ScholarshipsPage />}
-      {page === "tracker" && <TrackerPage tracked={tracked} updateTrack={updateTrack} removeTrack={removeTrack} session={session} />}
-      {page === "blog" && <BlogPage />}
+      {page === "scholarships" && <ScholarshipsPage session={session} />}
+      {page === "tracker" && <TrackerPage tracked={tracked} updateTrack={updateTrack} removeTrack={removeTrack} session={session} openAuth={() => setAuthOpen(true)} />}
+      {page === "plans" && <PlansPage session={session} openAuth={() => setAuthOpen(true)} />}
+      {page === "community" && <CommunityPage session={session} openAuth={() => setAuthOpen(true)} />}
+      {page === "blog" && <BlogPage session={session} />}
       {page === "contact" && <ContactPage />}
 
       <Buddy />
