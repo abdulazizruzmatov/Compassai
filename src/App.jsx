@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase.js";
 import { UNIVERSITIES } from "./data/universities.js";
 import { SCHOLARSHIPS } from "./data/scholarships.js";
 import { COUNTRY_COSTS } from "./data/countryCosts.js";
+import { verifiedFactsText } from "./data/verified.js";
 
 const Globe = lazy(() => import("react-globe.gl"));
 
@@ -95,8 +96,8 @@ ACCURACY RULES (critical — a student's future depends on this):
 4. When uncertain, say so plainly ("I'm not certain — check the official page") rather than sounding confident.
 5. Prefer being helpful with honest ranges over being impressive with fake precision.`;
 
-const VERIFIED_FACTS = `VERIFIED FACTS (curated, prefer these over your own guesses):
-` + COUNTRY_COSTS.map((c) => `- ${c.name}: rent ${c.rent}/mo, food ${c.food}/mo, transport ${c.transport}/mo; visa: ${c.visa}; note: ${c.note}`).join("\n");
+const VERIFIED_FACTS = `VERIFIED FACTS (curated & source-checked — prefer these over your own guesses):
+` + COUNTRY_COSTS.map((c) => `- ${c.name}: rent ${c.rent}/mo, food ${c.food}/mo, transport ${c.transport}/mo; visa: ${c.visa}; note: ${c.note}`).join("\n") + "\n\n" + verifiedFactsText();
 
 async function askAI(prompt) {
   prompt = AI_GUARD + "\n\n" + VERIFIED_FACTS + "\n\n" + prompt;
