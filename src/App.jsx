@@ -111,8 +111,28 @@ async function askAI(prompt, grounded = false) {
   return text;
 }
 function parseJSON(text) {
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+  let clean = (text || "").replace(/```json|```/g, "").trim();
+  const start = clean.indexOf("{");
+  let end = clean.lastIndexOf("}");
+  if (start === -1) throw new Error("no json");
+  // if truncated (no closing brace), try to repair by trimming to last complete object
+  if (end === -1 || end < start) {
+    const lastComplete = clean.lastIndexOf("}");
+    end = lastComplete > start ? lastComplete : clean.length - 1;
+  }
+  let slice = clean.slice(start, end + 1);
+  try { return JSON.parse(slice); }
+  catch {
+    // repair attempt: close dangling brackets
+    const opens = (slice.match(/{/g) || []).length;
+    const closes = (slice.match(/}/g) || []).length;
+    const arrOpens = (slice.match(/\[/g) || []).length;
+    const arrCloses = (slice.match(/\]/g) || []).length;
+    slice = slice.replace(/,\s*$/, "");
+    slice += "]".repeat(Math.max(0, arrOpens - arrCloses));
+    slice += "}".repeat(Math.max(0, opens - closes));
+    return JSON.parse(slice);
+  }
 }
 
 function consultPrompt(form) {
