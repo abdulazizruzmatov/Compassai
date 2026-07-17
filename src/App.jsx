@@ -99,8 +99,8 @@ ACCURACY RULES (critical — a student's future depends on this):
 const VERIFIED_FACTS = `VERIFIED FACTS (curated & source-checked — prefer these over your own guesses):
 ` + COUNTRY_COSTS.map((c) => `- ${c.name}: rent ${c.rent}/mo, food ${c.food}/mo, transport ${c.transport}/mo; visa: ${c.visa}; note: ${c.note}`).join("\n") + "\n\n" + verifiedFactsText();
 
-async function askAI(prompt) {
-  prompt = AI_GUARD + "\n\n" + VERIFIED_FACTS + "\n\n" + prompt;
+async function askAI(prompt, grounded = false) {
+  prompt = AI_GUARD + (grounded ? "\n\n" + VERIFIED_FACTS : "") + "\n\n" + prompt;
   const res = await fetch("/api/advisor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -605,7 +605,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
     setError(""); setPhase("loading");
     const withAnswers = { ...form, answers: (consult?.questions || []).map((q, i) => `${q} → ${answers[i] || "no answer"}`).join(" | ") };
     try {
-      const p = parseJSON(await askAI(planPrompt(withAnswers, [])));
+      const p = parseJSON(await askAI(planPrompt(withAnswers, []), true));
       setPlan(p.direction); setSkills(p.skills); setResources(p.resources || []); setUnis(p.unis || []); setPhase("results");
       if (supabase && session) await supabase.from("plans").insert({ user_id: session.user.id, profile: form, result: p });
     } catch (e) { console.error(e); setError("Couldn't build your plan — try again 🙏"); setPhase("consult"); }
@@ -614,7 +614,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
   const loadMore = async () => {
     setMore(true); setError("");
     try {
-      const p = parseJSON(await askAI(planPrompt(form, unis.map((u) => u.name))));
+      const p = parseJSON(await askAI(planPrompt(form, unis.map((u) => u.name)), true));
       setUnis((prev) => [...prev, ...(p.unis || [])]);
     } catch { setError("Couldn't load more right now."); }
     setMore(false);
@@ -857,7 +857,7 @@ function WorldPage() {
     // fly the globe to the clicked country
     const target = COUNTRY_COSTS.find((x) => x.name === c);
     if (globeRef.current && target) globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: 0.7 }, 1200);
-    try { setData(parseJSON(await askAI(worldPrompt(c, prof)))); }
+    try { setData(parseJSON(await askAI(worldPrompt(c, prof), true))); }
     catch (e) { console.error(e); setError("Couldn't load — try again 🙏"); }
     setBusy(false);
     setTimeout(() => document.getElementById("world-results")?.scrollIntoView({ behavior: "smooth" }), 300);
