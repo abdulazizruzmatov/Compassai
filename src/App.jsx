@@ -55,6 +55,19 @@ function usePage() {
 }
 const go = (p) => (window.location.hash = `/${p}`);
 
+/* ---------- My Direction: self-profile (foundation of the journey) ---------- */
+const loadDirection = () => { try { return JSON.parse(localStorage.getItem("compass-direction") || "{}"); } catch { return {}; } };
+const saveDirection = (d) => localStorage.setItem("compass-direction", JSON.stringify(d));
+
+const JOURNEY = [
+  ["direction", "1", "Understand yourself", "Reflect on who you are — interests, strengths, values.", "🧭"],
+  ["futures", "2", "Explore careers", "See several possible futures, not just one.", "🔮"],
+  ["experiments", "3", "Run experiments", "Small real tasks to test what actually fits.", "🧪"],
+  ["evidence", "4", "Build evidence", "Collect proof — projects, wins, what you learned.", "🏅"],
+  ["advisor", "5", "Find your direction", "AI turns it into degrees & matched universities.", "🎓"],
+  ["world", "6", "Match & apply", "Universities, scholarships, visas — and track it all.", "🌍"],
+];
+
 /* ---------------- shared profile (used by Advisor, World, Buddy) ---------------- */
 const loadProfile = () => { try { return JSON.parse(sessionStorage.getItem("compass-profile") || "{}"); } catch { return {}; } };
 const saveProfile = (p) => sessionStorage.setItem("compass-profile", JSON.stringify(p));
@@ -510,6 +523,73 @@ function UniCard({ u, home, idx, tracked, onTrack, session, openAuth }) {
 
 /* ================= PAGES ================= */
 
+function ComingSoonPage({ title, emoji, step, desc, next }) {
+  return (
+    <section className="section">
+      <div className="container" style={{ maxWidth: 640, textAlign: "center", padding: "40px 0" }}>
+        <div style={{ fontSize: 54 }}>{emoji}</div>
+        <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700, marginTop: 8 }}>STEP {step} · COMING SOON</div>
+        <h1 className="section-title" style={{ marginTop: 6 }}>{title}</h1>
+        <p className="section-sub" style={{ margin: "0 auto 24px" }}>{desc}</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <button className="btn btn-accent pill-btn" onClick={() => go("direction")}>← Back to My Direction</button>
+          {next && <button className="btn pill-btn pill-ghost" onClick={() => go(next)}>Skip ahead →</button>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DirectionPage() {
+  const saved = loadDirection();
+  const [f, setF] = useState({
+    interests: saved.interests || "", strengths: saved.strengths || "", weaknesses: saved.weaknesses || "",
+    values: saved.values || "", goals: saved.goals || "", reflection: saved.reflection || "",
+  });
+  const [savedMsg, setSavedMsg] = useState(false);
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const done = Object.values(f).filter((x) => String(x).trim()).length;
+  const save = () => { saveDirection(f); setSavedMsg(true); setTimeout(() => setSavedMsg(false), 2000); };
+
+  const FIELDS = [
+    ["interests", "What genuinely interests you? ❤️", "Topics, activities, things you lose track of time doing…"],
+    ["strengths", "What are you good at? 💪", "Skills, subjects, things people come to you for…"],
+    ["weaknesses", "What do you find hard? 🌱", "Be honest — this is where growth happens…"],
+    ["values", "What matters to you? 🧭", "e.g. helping people, creating, independence, stability, impact…"],
+    ["goals", "Where do you want to be in 5 years? 🎯", "A rough picture is fine — a feeling, a lifestyle, a field…"],
+    ["reflection", "Anything else about you? 💭", "A story, a dream, a fear, a moment that shaped you…"],
+  ];
+
+  return (
+    <section className="section">
+      <div className="container" style={{ maxWidth: 720 }}>
+        <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700 }}>STEP 1 · UNDERSTAND YOURSELF</div>
+        <h1 className="section-title" style={{ marginTop: 8 }}>My Direction 🧭</h1>
+        <p className="section-sub">Before universities, before careers — start with you. This becomes the foundation Compass uses to guide every step. Honest answers beat perfect ones.</p>
+
+        <div className="wiz-bar" style={{ marginBottom: 4 }}><div className="wiz-fill" style={{ width: `${(done / 6) * 100}%` }} /></div>
+        <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginBottom: 20 }}>{done}/6 reflected</div>
+
+        <div style={{ display: "grid", gap: 18 }}>
+          {FIELDS.map(([k, label, ph]) => (
+            <div key={k} className="card" style={{ padding: 18 }}>
+              <div className="f-label" style={{ marginBottom: 8 }}>{label}</div>
+              <textarea className="input f-input" style={{ minHeight: 70, resize: "vertical" }} value={f[k]} onChange={(e) => set(k, e.target.value)} placeholder={ph} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 20, flexWrap: "wrap" }}>
+          <button className="btn btn-accent pill-btn" onClick={save}>Save my direction</button>
+          <button className="btn pill-btn pill-ghost" onClick={() => { save(); go("futures"); }}>Next: explore careers →</button>
+          {savedMsg && <span style={{ color: "var(--green)", fontWeight: 700, fontSize: 14 }}>✓ Saved</span>}
+        </div>
+        <p style={{ color: "var(--slate)", fontSize: 12.5, marginTop: 16 }}>Saved privately on your device. Sign in later to sync across devices.</p>
+      </div>
+    </section>
+  );
+}
+
 function HomePage() {
   return (
     <>
@@ -525,11 +605,31 @@ function HomePage() {
               Compass turns "I want to be a game developer 🎮" into degrees explained, real universities, honest chances, visa steps and scholarships — free, no agency.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button className="btn btn-accent pill-btn" onClick={() => go("advisor")}>Who do you wanna be? →</button>
+              <button className="btn btn-accent pill-btn" onClick={() => go("direction")}>Start with you →</button>
               <button className="btn pill-btn pill-ghost" onClick={() => go("world")}>🌍 Explore countries</button>
             </div>
           </div>
           <CompassHero />
+        </div>
+      </section>
+
+      <section className="section" style={{ paddingBottom: 0 }}>
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: 8 }}>
+            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700 }}>YOUR JOURNEY</div>
+            <h2 className="section-title" style={{ fontSize: 30 }}>From "who am I?" to "I'm in." 🧭</h2>
+            <p className="section-sub" style={{ margin: "0 auto" }}>Compass doesn't start at university search. It starts with you — then walks the whole path.</p>
+          </div>
+          <div className="journey-grid">
+            {JOURNEY.map(([id, n, title, desc, emoji], i) => (
+              <button key={id} onClick={() => go(id)} className="journey-step">
+                <div className="journey-num">{emoji}</div>
+                <div className="mono" style={{ fontSize: 10.5, letterSpacing: "0.1em", color: "var(--accent)", fontWeight: 700 }}>STEP {n}</div>
+                <div className="display" style={{ fontWeight: 700, fontSize: 15.5, margin: "3px 0 5px", lineHeight: 1.15 }}>{title}</div>
+                <div style={{ fontSize: 12.5, color: "var(--slate)", lineHeight: 1.45 }}>{desc}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1773,7 +1873,7 @@ export default function App() {
     if (supabase && session) await supabase.from("tracked_applications").delete().eq("id", id);
   };
 
-  const NAV_MAIN = [["advisor", "🧭 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`]];
+  const NAV_MAIN = [["direction", "🧭 My Direction"], ["advisor", "🎓 Advisor"], ["world", "🌍 World"], ["scholarships", "🎓 Scholarships"], ["tracker", `📋 Tracker${tracked.length ? ` (${tracked.length})` : ""}`]];
   const NAV_MORE = [["community", "💬 Community"], ["plans", "🚀 Plans"], ["blog", "📚 Blog"], ["contact", "💬 Contact"]];
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -1814,6 +1914,10 @@ export default function App() {
       </header>
 
       {page === "home" && <HomePage />}
+      {page === "direction" && <DirectionPage />}
+      {page === "futures" && <ComingSoonPage title="Possible Futures" emoji="🔮" step="2" desc="We'll show you several career directions that fit — never just one — each with why it fits, the skills, and a first experiment to try. Building this next." next="advisor" />}
+      {page === "experiments" && <ComingSoonPage title="Experiments" emoji="🧪" step="3" desc="Small real-world tasks to test what actually fits you — then reflect, and Compass learns. Coming soon." next="advisor" />}
+      {page === "evidence" && <ComingSoonPage title="Evidence" emoji="🏅" step="4" desc="Your locker of projects, wins, and what you learned — the proof that makes applications strong. Coming soon." next="advisor" />}
       {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} openAuth={() => setAuthOpen(true)} />}
       {page === "world" && <WorldPage />}
       {page === "scholarships" && <ScholarshipsPage session={session} />}
