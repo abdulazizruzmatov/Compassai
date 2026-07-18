@@ -155,6 +155,17 @@ Respond ONLY valid JSON:
 {"reflection":"4-5 sentences: reflect their goal back, honest pros AND cons of this path for someone like them, one alternative path worth considering","questions":["3 short personal questions a good consultant would ask before recommending (about motivation, constraints, preferences)"]}`;
 }
 
+async function askJSON(prompt, grounded = false, tries = 2) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const strict = prompt + "\n\nIMPORTANT: reply with ONLY the raw JSON object. No markdown, no code fences, no text before or after.";
+      return parseJSON(await askAI(strict, grounded));
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
 function planPrompt(form, excludeNames) {
   return `You are an expert international education advisor replacing a paid agency. Student profile:
 - Wants to become: ${form.goal}
@@ -716,7 +727,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
     setError(""); setPhase("thinking"); saveProfile(form);
     if (!session) bumpUsage();
     try {
-      const c = parseJSON(await askAI(consultPrompt(form)));
+      const c = await askJSON(consultPrompt(form));
       setConsult(c); setAnswers((c.questions || []).map(() => "")); setPhase("consult");
     } catch (e) { console.error(e); setError("Couldn't reach your consultant — try again 🙏"); setPhase("form"); }
   };
@@ -725,7 +736,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
     setError(""); setPhase("loading");
     const withAnswers = { ...form, answers: (consult?.questions || []).map((q, i) => `${q} → ${answers[i] || "no answer"}`).join(" | ") };
     try {
-      const p = parseJSON(await askAI(planPrompt(withAnswers, []), true));
+      const p = await askJSON(planPrompt(withAnswers, []), true);
       setPlan(p.direction); setSkills(p.skills); setResources(p.resources || []); setUnis(p.unis || []); setPhase("results");
       if (supabase && session) await supabase.from("plans").insert({ user_id: session.user.id, profile: form, result: p });
     } catch (e) { console.error(e); setError("Couldn't build your plan — try again 🙏"); setPhase("consult"); }
@@ -734,7 +745,7 @@ function AdvisorPage({ tracked, track, session, openAuth }) {
   const loadMore = async () => {
     setMore(true); setError("");
     try {
-      const p = parseJSON(await askAI(planPrompt(form, unis.map((u) => u.name)), true));
+      const p = await askJSON(planPrompt(form, unis.map((u) => u.name)), true);
       setUnis((prev) => [...prev, ...(p.unis || [])]);
     } catch { setError("Couldn't load more right now."); }
     setMore(false);
@@ -977,7 +988,7 @@ function WorldPage() {
     // fly the globe to the clicked country
     const target = COUNTRY_COSTS.find((x) => x.name === c);
     if (globeRef.current && target) globeRef.current.pointOfView({ lat: target.lat, lng: target.lng, altitude: 0.7 }, 1200);
-    try { setData(parseJSON(await askAI(worldPrompt(c, prof), true))); }
+    try { setData(await askJSON(worldPrompt(c, prof), true)); }
     catch (e) { console.error(e); setError("Couldn't load — try again 🙏"); }
     setBusy(false);
     setTimeout(() => document.getElementById("world-results")?.scrollIntoView({ behavior: "smooth" }), 300);
@@ -1390,21 +1401,21 @@ function TrackerPage({ tracked, updateTrack, removeTrack, session, openAuth }) {
 function PlansPage({ session, openAuth }) {
   const TIERS = [
     {
-      name: "Free", tag: "Start here", accent: "var(--slate)", featured: false,
-      line: "Taste the compass.",
-      feats: ["3 AI advisor plans / day", "World Explorer with your chances", "Scholarship directory + live feed", "Track up to 5 universities", "Community Buddy chat"],
-      cta: session ? "Your current plan" : "Sign in free", disabled: !!session,
+      name: "Explore", tag: "Find your direction", accent: "var(--slate)", featured: false,
+      line: "Discover who you are and where you could go — free, forever.",
+      feats: ["Build your Direction profile", "3 AI career-to-uni plans / day", "Explore possible futures", "World Explorer with honest chances", "Scholarship directory, updated daily", "Track up to 5 universities"],
+      cta: session ? "Your current plan" : "Start free", disabled: !!session,
     },
     {
-      name: "Pro", tag: "Most popular", accent: "var(--accent)", featured: true,
-      line: "For students actively applying.",
-      feats: ["Unlimited AI advisor plans", "Deeper personalised analysis", "Full application & visa prep checklists", "Unlimited university tracking", "Document & deadline reminders", "Priority Buddy responses"],
+      name: "Focus", tag: "Most popular", accent: "var(--accent)", featured: true,
+      line: "For students ready to commit and apply.",
+      feats: ["Everything in Explore", "Unlimited AI plans & deeper analysis", "Run experiments & build your evidence", "Full application & visa prep checklists", "Unlimited university tracking", "Deadline & document reminders"],
       cta: "Coming soon", disabled: true,
     },
     {
-      name: "Max", tag: "Serious about a top uni", accent: "var(--ink)", featured: false,
-      line: "The full career-to-university engine.",
-      feats: ["Everything in Pro", "Complete career-to-university roadmap", "Essay & personal-statement guidance", "Scholarship-match shortlisting", "Mock interview & CAS/visa walkthrough", "Early access to IELTS · SAT · GRE tools"],
+      name: "Summit", tag: "Aiming for the top", accent: "var(--ink)", featured: false,
+      line: "The complete engine — from first idea to offer letter.",
+      feats: ["Everything in Focus", "Your full career-to-university roadmap", "Essay & personal-statement guidance", "Scholarship-match shortlisting", "Mock interview & CAS/visa walkthrough", "Early access to IELTS · SAT · GRE tools"],
       cta: "Coming soon", disabled: true,
     },
   ];
