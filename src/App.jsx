@@ -534,6 +534,222 @@ function UniCard({ u, home, idx, tracked, onTrack, session, openAuth }) {
 
 /* ================= PAGES ================= */
 
+/* ===== Journey storage (futures / experiments / evidence) ===== */
+const loadFutures = () => { try { return JSON.parse(localStorage.getItem("compass-futures") || "null"); } catch { return null; } };
+const saveFutures = (f) => localStorage.setItem("compass-futures", JSON.stringify(f));
+const loadChosen = () => { try { return JSON.parse(localStorage.getItem("compass-chosen-future") || "null"); } catch { return null; } };
+const saveChosen = (f) => localStorage.setItem("compass-chosen-future", JSON.stringify(f));
+const loadExperiments = () => { try { return JSON.parse(localStorage.getItem("compass-experiments") || "[]"); } catch { return []; } };
+const saveExperiments = (x) => localStorage.setItem("compass-experiments", JSON.stringify(x));
+const loadEvidence = () => { try { return JSON.parse(localStorage.getItem("compass-evidence") || "[]"); } catch { return []; } };
+const saveEvidence = (x) => localStorage.setItem("compass-evidence", JSON.stringify(x));
+
+function futuresPrompt(dir) {
+  return "A student reflected on themselves. Interests: " + (dir.interests || "n/a") +
+    ". Strengths: " + (dir.strengths || "n/a") + ". Weaknesses: " + (dir.weaknesses || "n/a") +
+    ". Values: " + (dir.values || "n/a") + ". Goals: " + (dir.goals || "n/a") +
+    ". Reflection: " + (dir.reflection || "n/a") +
+    ". Suggest 4 genuinely different career/education directions that fit this person, never just one. Mix an obvious path with 1-2 they might not have considered. Be specific to what they wrote. Respond ONLY raw JSON: " +
+    '{"futures":[{"title":"","emoji":"","whyFits":"2 sentences why THIS person fits","degrees":["1-2 study paths"],"skills":["3 skills"],"firstExperiment":"one small task to try this week","evidence":"what pursuing this builds for applications"}]}';
+}
+
+function FuturesPage() {
+  const dir = loadDirection();
+  const hasDirection = Object.values(dir).some((x) => String(x || "").trim());
+  const [futures, setFutures] = useState(loadFutures());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [chosen, setChosen] = useState(loadChosen());
+
+  const generate = async () => {
+    setError(""); setBusy(true);
+    try { const data = await askJSON(futuresPrompt(dir), true); setFutures(data.futures || []); saveFutures(data.futures || []); }
+    catch (e) { console.error(e); setError("Couldn't generate futures. Try again."); }
+    setBusy(false);
+  };
+  const choose = (f) => { setChosen(f); saveChosen(f); };
+
+  if (!hasDirection) {
+    return (
+      <section className="section"><div className="container" style={{ maxWidth: 620, textAlign: "center", padding: "40px 0" }}>
+        <div style={{ fontSize: 50 }}>🧭</div>
+        <h1 className="section-title" style={{ marginTop: 8 }}>First, understand yourself</h1>
+        <p className="section-sub" style={{ margin: "0 auto 22px" }}>Possible Futures reads your Direction profile to suggest paths that fit you. Fill it in first.</p>
+        <button className="btn btn-accent pill-btn" onClick={() => go("direction")}>Go to My Direction</button>
+      </div></section>
+    );
+  }
+  return (
+    <section className="section"><div className="container" style={{ maxWidth: 900 }}>
+      <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700 }}>STEP 2 · EXPLORE CAREERS</div>
+      <h1 className="section-title" style={{ marginTop: 8 }}>Possible Futures 🔮</h1>
+      <p className="section-sub">Not one right answer — several directions that fit who you are. Explore, then pick one to build toward.</p>
+      {!futures && !busy && (
+        <div className="card" style={{ padding: 28, textAlign: "center" }}>
+          <div style={{ fontSize: 40 }}>🔮</div>
+          <div className="display" style={{ fontWeight: 700, fontSize: 20, margin: "8px 0 6px" }}>Ready to see your paths?</div>
+          <p style={{ color: "var(--slate)", fontSize: 14.5, maxWidth: 440, margin: "0 auto 18px" }}>Compass reads your reflection and suggests 4 directions, each with a first experiment.</p>
+          <button className="btn btn-accent pill-btn" onClick={generate}>✨ Show my possible futures</button>
+        </div>
+      )}
+      {busy && <StudyLoader title="Exploring paths that fit you" />}
+      {error && <div style={{ color: "var(--red)", fontWeight: 700, textAlign: "center", margin: "10px 0" }}>{error}</div>}
+      {futures && !busy && (<>
+        <div className="grid2" style={{ marginTop: 4 }}>
+          {futures.map((f, i) => {
+            const isChosen = chosen && chosen.title === f.title;
+            return (
+              <div key={i} className="card" style={{ padding: 22, borderTop: "4px solid " + (isChosen ? "var(--accent)" : "var(--line)") }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ fontSize: 34 }}>{f.emoji || "🎯"}</div>
+                  {isChosen && <span className="tag-green">✓ Your path</span>}
+                </div>
+                <div className="display" style={{ fontWeight: 700, fontSize: 20, margin: "8px 0 6px" }}>{f.title}</div>
+                <div style={{ fontSize: 14, lineHeight: 1.55 }}>{f.whyFits}</div>
+                <div className="label" style={{ marginTop: 14 }}>🎓 Study paths</div>
+                <div style={{ fontSize: 13.5 }}>{(f.degrees || []).join(" · ")}</div>
+                <div className="label" style={{ marginTop: 12 }}>💪 Skills to build</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{(f.skills || []).map((s, j) => <span key={j} className="tag-green">{s}</span>)}</div>
+                <div style={{ marginTop: 14, background: "#EFF6F1", borderRadius: 10, padding: "12px 14px" }}>
+                  <div className="mono" style={{ fontSize: 10.5, letterSpacing: "0.1em", color: "var(--accent)", fontWeight: 700 }}>🧪 TRY THIS WEEK</div>
+                  <div style={{ fontSize: 13.5, marginTop: 4 }}>{f.firstExperiment}</div>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--slate)", marginTop: 10 }}>📈 Builds: {f.evidence}</div>
+                <button className={"btn " + (isChosen ? "btn-ghost" : "btn-accent")} style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={() => choose(f)}>{isChosen ? "✓ Chosen" : "Choose this direction"}</button>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+          <button className="btn pill-btn pill-ghost" onClick={generate}>🔄 Show different paths</button>
+          <button className="btn btn-accent pill-btn" onClick={() => go("experiments")}>Next: run experiments →</button>
+        </div>
+      </>)}
+    </div></section>
+  );
+}
+
+function ExperimentsPage() {
+  const chosen = loadChosen();
+  const [items, setItems] = useState(loadExperiments());
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const persist = (list) => { setItems(list); saveExperiments(list); };
+  const suggest = async () => {
+    setBusy(true);
+    try {
+      const ctx = chosen ? "They are exploring becoming: " + chosen.title + "." : "";
+      const data = await askJSON("A student wants small real-world experiments to test a career direction. " + ctx + " Suggest 4 concrete mini-tasks doable in a week, free and practical. Respond ONLY raw JSON: " + '{"experiments":[{"title":"","why":"what it tests"}]}', true);
+      const now = (data.experiments || []).map((e) => ({ id: crypto.randomUUID(), title: e.title, why: e.why, status: "todo", reflection: "" }));
+      persist([...now, ...items]);
+    } catch (e) { console.error(e); }
+    setBusy(false);
+  };
+  const add = () => { if (!title.trim()) return; persist([{ id: crypto.randomUUID(), title, why: "", status: "todo", reflection: "" }, ...items]); setTitle(""); };
+  const update = (id, patch) => persist(items.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const remove = (id) => persist(items.filter((x) => x.id !== id));
+  const done = items.filter((x) => x.status === "done").length;
+  const toEvidence = (x) => { const ev = loadEvidence(); saveEvidence([{ id: crypto.randomUUID(), title: x.title, learned: x.reflection || "", date: new Date().toISOString().slice(0, 10), fromExperiment: true }, ...ev]); go("evidence"); };
+  return (
+    <section className="section"><div className="container" style={{ maxWidth: 760 }}>
+      <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700 }}>STEP 3 · RUN EXPERIMENTS</div>
+      <h1 className="section-title" style={{ marginTop: 8 }}>Experiments 🧪</h1>
+      <p className="section-sub">Don't guess if a path fits — test it. Try small real tasks, then reflect. Reflection becomes evidence.</p>
+      {chosen && <div className="card" style={{ padding: "12px 16px", marginBottom: 16, background: "#EFF6F1", border: "none", fontSize: 14 }}>🎯 Testing your path: <b>{chosen.title}</b></div>}
+      <div style={{ marginBottom: 16 }}><button className="btn btn-accent" style={{ padding: "11px 18px" }} onClick={suggest} disabled={busy}>{busy ? "Thinking…" : "✨ Suggest experiments"}</button></div>
+      <div className="card" style={{ padding: 16, marginBottom: 18 }}>
+        <div className="f-label" style={{ marginBottom: 8 }}>Add your own</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input className="input" placeholder="e.g. Build a small website in a weekend" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+          <button className="btn btn-ghost" style={{ padding: "11px 16px" }} onClick={add}>Add</button>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--slate)", padding: "40px 0" }}>
+          <div style={{ fontSize: 40 }}>🧪</div>
+          <div className="display" style={{ fontWeight: 700, fontSize: 18, color: "var(--ink)", marginTop: 8 }}>No experiments yet</div>
+        </div>
+      ) : (<>
+        <div className="wiz-bar" style={{ marginBottom: 4 }}><div className="wiz-fill" style={{ width: (done / items.length * 100) + "%" }} /></div>
+        <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginBottom: 14 }}>{done}/{items.length} done</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          {items.map((x) => (
+            <div key={x.id} className="card" style={{ padding: 16, borderLeft: "4px solid " + (x.status === "done" ? "var(--green)" : x.status === "doing" ? "var(--amber)" : "var(--line)") }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 16 }}>{x.title}</div>
+                  {x.why && <div style={{ color: "var(--slate)", fontSize: 13, marginTop: 2 }}>Tests: {x.why}</div>}
+                </div>
+                <button onClick={() => remove(x.id)} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>✕</button>
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                {["todo", "doing", "done"].map((s) => (<button key={s} className={"chip " + (x.status === s ? "on" : "")} style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => update(x.id, { status: s })}>{s === "todo" ? "To do" : s === "doing" ? "Doing" : "Done ✓"}</button>))}
+              </div>
+              {x.status === "done" && (
+                <div style={{ marginTop: 12 }}>
+                  <div className="f-label" style={{ marginBottom: 6 }}>💭 What did you learn? Did it fit?</div>
+                  <textarea className="input f-input" style={{ minHeight: 56, resize: "vertical" }} placeholder="I enjoyed... / I found it hard... / this made me realise..." value={x.reflection} onChange={(e) => update(x.id, { reflection: e.target.value })} />
+                  {x.reflection.trim() && <button className="btn btn-accent" style={{ padding: "9px 15px", fontSize: 13, marginTop: 10 }} onClick={() => toEvidence(x)}>🏅 Save as evidence →</button>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </>)}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}><button className="btn pill-btn pill-ghost" onClick={() => go("evidence")}>Next: build evidence →</button></div>
+    </div></section>
+  );
+}
+
+function EvidencePage() {
+  const [items, setItems] = useState(loadEvidence());
+  const [title, setTitle] = useState("");
+  const [learned, setLearned] = useState("");
+  const persist = (list) => { setItems(list); saveEvidence(list); };
+  const add = () => { if (!title.trim()) return; persist([{ id: crypto.randomUUID(), title, learned, date: new Date().toISOString().slice(0, 10), fromExperiment: false }, ...items]); setTitle(""); setLearned(""); };
+  const remove = (id) => persist(items.filter((x) => x.id !== id));
+  return (
+    <section className="section"><div className="container" style={{ maxWidth: 760 }}>
+      <div className="mono" style={{ fontSize: 12, letterSpacing: "0.16em", color: "var(--accent)", fontWeight: 700 }}>STEP 4 · BUILD EVIDENCE</div>
+      <h1 className="section-title" style={{ marginTop: 8 }}>Evidence 🏅</h1>
+      <p className="section-sub">Applications aren't about what you say — they're about what you've done. Collect projects, wins and lessons. This is the proof behind every application.</p>
+      <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+        <div className="f-label" style={{ marginBottom: 8 }}>Add evidence</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          <input className="input" placeholder="What did you do? e.g. Volunteered 20 hrs at a clinic" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <textarea className="input f-input" style={{ minHeight: 54, resize: "vertical" }} placeholder="What did you learn or achieve?" value={learned} onChange={(e) => setLearned(e.target.value)} />
+          <button className="btn btn-accent" style={{ justifySelf: "start", padding: "11px 18px" }} onClick={add}>Add evidence</button>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--slate)", padding: "40px 0" }}>
+          <div style={{ fontSize: 40 }}>🏅</div>
+          <div className="display" style={{ fontWeight: 700, fontSize: 18, color: "var(--ink)", marginTop: 8 }}>Your evidence locker is empty</div>
+          <div style={{ fontSize: 14, marginTop: 6 }}>Finish experiments or add wins — projects, volunteering, courses, awards.</div>
+        </div>
+      ) : (<>
+        <div className="mono" style={{ fontSize: 12, color: "var(--slate)", marginBottom: 12 }}>{items.length} piece{items.length === 1 ? "" : "s"} of evidence 💪</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          {items.map((x) => (
+            <div key={x.id} className="card" style={{ padding: 16, borderLeft: "4px solid var(--green)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div className="display" style={{ fontWeight: 700, fontSize: 16 }}>{x.title} {x.fromExperiment && <span className="tag-green" style={{ marginLeft: 6 }}>🧪 from experiment</span>}</div>
+                  {x.learned && <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>💭 {x.learned}</div>}
+                  <div className="mono" style={{ fontSize: 11, color: "var(--slate)", marginTop: 6 }}>{x.date}</div>
+                </div>
+                <button onClick={() => remove(x.id)} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>)}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}><button className="btn btn-accent pill-btn" onClick={() => go("advisor")}>Now find your universities →</button></div>
+    </div></section>
+  );
+}
+
+
 function ComingSoonPage({ title, emoji, step, desc, next }) {
   return (
     <section className="section">
@@ -1926,9 +2142,9 @@ export default function App() {
 
       {page === "home" && <HomePage />}
       {page === "direction" && <DirectionPage />}
-      {page === "futures" && <ComingSoonPage title="Possible Futures" emoji="🔮" step="2" desc="We'll show you several career directions that fit — never just one — each with why it fits, the skills, and a first experiment to try. Building this next." next="advisor" />}
-      {page === "experiments" && <ComingSoonPage title="Experiments" emoji="🧪" step="3" desc="Small real-world tasks to test what actually fits you — then reflect, and Compass learns. Coming soon." next="advisor" />}
-      {page === "evidence" && <ComingSoonPage title="Evidence" emoji="🏅" step="4" desc="Your locker of projects, wins, and what you learned — the proof that makes applications strong. Coming soon." next="advisor" />}
+      {page === "futures" && <FuturesPage />}
+      {page === "experiments" && <ExperimentsPage />}
+      {page === "evidence" && <EvidencePage />}
       {page === "advisor" && <AdvisorPage tracked={tracked} track={track} session={session} openAuth={() => setAuthOpen(true)} />}
       {page === "world" && <WorldPage />}
       {page === "scholarships" && <ScholarshipsPage session={session} />}
